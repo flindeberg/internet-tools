@@ -30,7 +30,7 @@ You also need som python modules, and of course python (3+) itself. Python is mo
 
 When you have pip(3) installed, run the following:
 
-    pip3 install networkx matplotlib.pyplot urllib splinter bs4 cymruwhois
+    pip3 install networkx matplotlib.pyplot urllib splinter bs4 cymruwhois dnspython
 
 Depending on system pip3 might not be aliased and instead pip should be used. 
 
