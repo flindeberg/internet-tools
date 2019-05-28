@@ -30,9 +30,9 @@ You also need som python modules, and of course python (3+) itself. Python is mo
 
 When you have pip(3) installed, run the following:
 
-    pip3 install networkx matplotlib.pyplot urllib splinter bs4 cymruwhois dnspython
+    pip3 install networkx matplotlib splinter bs4 cymruwhois pyasn dnspython
 
-Depending on system pip3 might not be aliased and instead pip should be used. 
+Depending on system pip3 might not be aliased and instead pip should be used. Also some systems might require pip3 to be run as root (or use the `--user` flag to do a user install).
 
 ## Using the tools
 
@@ -40,7 +40,7 @@ This repository contains tools usable in general python projects, such as (simpl
 
 ### Modules
 
-See src/ directory, and in particular `tracert.py`, `har_wrapper.py` and `utils.py`.
+See src/ directory, and in particular `tracert.py`, `har_wrapper.py` and `utils.py`. Depending on arguments it might be necessary to run `pyasn_util_download.py --latestv46` in the working directory for `pyasn` sake.
 
 ### Command line tools
 
