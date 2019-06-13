@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import functools
+import ipaddress
 import json
 import os
 import re
@@ -9,11 +10,13 @@ import sys
 from dataclasses import dataclass
 from enum import Enum
 from subprocess import call
-from typing import Dict, List, Tuple
+from typing import Dict, List, NamedTuple, Tuple
 from urllib.parse import urlparse
 
-import cymruwhois
 import DNS
+import dns.resolver
+#import cymruwhois
+import pyasn
 import pycountry
 
 from parallelltracert import TraceManager
@@ -73,9 +76,47 @@ class AS:
         return AS(d.owner,d.asn,d.cc,ip)
 
 
+    @classmethod
+    def CreateFromPyasnStr(cls, ip: str, asn: int, s: str) -> AS:
+        ## create and return basically.
+        country = pycountry.countries.get(alpha_2=s[-2:])
+        return AS(s,asn,country,ip)
+
 ## Type aliases
 AsList = List[AS]
 EdgeList = List[EdgeTuple]
+AsDict = Dict[int, AS]
+IpAsDict = Dict[str, AS]
+
+class AsInfo(NamedTuple):
+    ipas: AsDict = dict()
+    asas: IpAsDict = dict()
+
+
+class ASNLookup:
+    """ Class for looking up ASN data """
+    # currently based on pyasn, and has to be. They have the correct data
+
+    def __init__(self):
+        # load all names and pyas
+        self.p = pyasn.pyasn("pyasn.dat", "pyasn.json")
+
+    def lookupmany(self, ips: List[str]) -> AsInfo:
+        
+        asinfo = AsInfo()
+
+        # go through ips and resolve  them
+        for ip in ips:
+            # tuple, 0 = asn, 1 = prefix
+            r = self.p.lookup(ip)
+            name = self.p.get_as_name(r[0])
+            asn = AS.CreateFromPyasnStr(ip, r[0], name)
+
+            # lets create both dictionaries for now
+            asinfo.ipas[ip] = asn
+            asinfo.asas[r[0]] = asn
+
+        return asinfo
 
 class HarResult:
     """ Class for storing data from har request """
@@ -241,20 +282,24 @@ class CheckHAR:
         self.nameip = dict()
         self.ipname = dict()
     
-    def GetAsList(self, l : List[str]) -> AsList:
-        cymruClient = cymruwhois.Client()
+    def GetAsList(self, l : List[str]) -> AsInfo:
+        #cymruClient = cymruwhois.Client()
         ## lookupmany only takes ip, so we have to convert from asn to ip and back..
         ## enumerate the list, else we get issues "sometimes"
-        ipsasndict = cymruClient.lookupmany_dict(l)
-        asnlist = []
+        #ipsasndict = cymruClient.lookupmany_dict(l)
+        #asnlist = []
+
+        asnlookup = ASNLookup()
+
+        return asnlookup.lookupmany(l)
 
         ## iterate through and create the list
-        for key in ipsasndict.keys():
-            s = AS.CreateFromDict(key, ipsasndict[key])
-            asnlist.append(s)
-            ipsasndict[key] = s
+        #for key in ipsasndict.keys():
+        #    s = AS.CreateFromDict(key, ipsasndict[key])
+        #    asnlist.append(s)
+        #    ipsasndict[key] = s
 
-        return asnlist, ipsasndict
+        #return asnlist, ipsasndict
 
     def Load(self, file):
         # these are reloaded per HAR-file
@@ -291,7 +336,9 @@ class CheckHAR:
             for h in self.result.hosts:
                 try:
                     ## find both a (ipv4) and aaaa (ipv6) records
-                    ips = DNS.dnslookup(h, "a")
+                    dns.resolver
+                    #ips = DNS.dnslookup(h, "a")
+                    ips = (a.address for a in dns.resolver.query(h, "A"))
                     # IPv6 fails in the tracer. So lets skip it for now
                     #ips6 = DNS.dnslookup(h, "aaaa")
                     #if ips6 is not None:
@@ -301,7 +348,7 @@ class CheckHAR:
                         try:
                             ## ip_inner is thrown and useless, but we need to check if "ip" is an actual ip 
                             ## in terms of format, and not a host (as the case in a cname -> cname -> a chain)
-                            ip_inner = DNS.ipaddress.ip_address(ip)
+                            ip_inner = ipaddress.ip_address(ip)
                             ## here we know it is an ip
                             locallistips.append(ip_inner.exploded)
                             ## cache so we can do a reverse lookup quick
@@ -318,7 +365,9 @@ class CheckHAR:
                     print("Unexpected error:", sys.exc_info()[0])
                     print("Unexpected error:", sys.exc_info())
 
-            self.result.asns = self.GetAsList(locallistips)
+            ## only host ips
+            r = self.GetAsList(locallistips)
+            self.result.asns = r.asas.values()
 
             # lets trace them all (requires root)
             tracedIps = TraceManager.TraceAll(locallistips)
@@ -331,7 +380,10 @@ class CheckHAR:
 
             # get asns from ips
             allIps = functools.reduce(list.__add__, tracedIps)
-            self.result.asnsAll, self.asndict = self.GetAsList(list(set(allIps)))
+            ## now we get all ips, store all as and the ipas dict separately
+            r = self.GetAsList(list(set(allIps)))
+            self.result.asnsAll = r.asas.values()
+            self.asndict = r.ipas
 
             # add a fake localhost in local network
             self.asndict["localhost"] = AS("local network", "NA", "", "10.0.0.1")
@@ -340,11 +392,17 @@ class CheckHAR:
             # Gettings asns
             for tip in self.result.hostTraceMap.keys():
                 filtered = list(filter(lambda x: x != "*",self.result.hostTraceMap[tip]))
-                #self.result.asnTraceMap[tip] =  self.GetAsList(filtered)
+
+                ## hostmap has hosts only
+                ## asnmap has localhost, asns in the middle and hosts at the edges
                 self.result.hostTraceMap[tip] = filtered
                 self.result.asnTraceMap[tip] = list()
                 for item in self.result.hostTraceMap[tip]:
                     self.result.asnTraceMap[tip].append(self.asndict[item])
+                    ## TODO debug info
+                    if item == "localhost":
+                        print("localhost found {:}".format(self.result.hostTraceMap[tip]))
+
 
             # filter it so we only have unique values
             # asns where we fetched resources
@@ -358,6 +416,10 @@ class CheckHAR:
         """
             Function for getting the edges for drawing a graph out of a HarResult
         """
+
+        ## local network counter
+        i = 1
+
         # make sure we get the right list to start with
         if dohosts:
             currentList = self.result.hostTraceMap
@@ -405,11 +467,17 @@ class CheckHAR:
 
             if (isinstance(left, AS) and left.asn == "NA"):
                 ## fix it, its local network
-                left.name = "local network"
+                print ("local network found: {:}".format(left))
+                left.name = "local network {:}".format(i)
+                i += 1
+                print ("local network found: {:}".format(left))
 
             if (isinstance(right, AS) and right.asn == "NA"):
                 ## fix it, its local network
-                right.name = "local network"
+                print ("local network found: {:}".format(right))
+                right.name = "local network {:}".format(i)
+                i += 1
+                print ("local network found: {:}".format(right))
 
             if isinstance(left, AS) and isinstance(right, AS):
                 # edgetype is between as:es
@@ -444,6 +512,7 @@ class CheckHAR:
                 left = left.name
                 lefttype = EdgeType.asn
             elif left in self.ipname and useHostnames:
+                ## convert ip to hostname
                 left = self.ipname[left]
 
 
@@ -460,6 +529,7 @@ class CheckHAR:
                 right = right.name
                 righttype = EdgeType.asn
             elif right in self.ipname and useHostnames:
+                ## convert ip to hostname
                 right = self.ipname[right]
 
             reverselist.append(EdgeTuple(left,right, lefttype, righttype, edgeType=et))
