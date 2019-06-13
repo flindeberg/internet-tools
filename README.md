@@ -40,7 +40,7 @@ This repository contains tools usable in general python projects, such as (simpl
 
 ### Modules
 
-See src/ directory, and in particular `tracert.py`, `har_wrapper.py` and `utils.py`. Depending on arguments it might be necessary to run `pyasn_util_download.py --latestv46` in the working directory for `pyasn` sake.
+See `src/` directory, and in particular `tracert.py`, `har_wrapper.py` and `utils.py`. Depending on arguments it might be necessary to run `pyasn_util_download.py --latestv46` in the working directory for `pyasn` sake.
 
 ### Command line tools
 
@@ -48,11 +48,11 @@ The most interesting tool to use quickly is the `generate_map.py`, which generat
 
 Some example usages:
 
-    ## Visit Washington Post and show the graph afterwards (no modifier is the same as -u or --url)
-    sudo python3 generate_map.py washingtonpost.com
+    ## Visit Washington Post and show the graph afterwards (-w for website)
+    sudo python3 generatemap.py -w www.nytimes.com www.cnn.com
     
-    ## Draw a single graph based on a har (or set of hars)
-    sudo python3 generate_map.py some_data.har some_data2.har
+    ## Draw a single graph based on a har (or set of hars) and puts the graphs in "myoutputfolder"
+    sudo python3 generatemap.py -e inputfolder/some_data.har someotherfolder/some_data2.har -o myoutputfolder/
     
     ## Draw separate graphs based on urls quietly (-s or --separate to do individual runs, -q or --quiet for no output)
     sudo python3 generate_map.py -s -q washingtonpost.com nytimes.com cnn.com
