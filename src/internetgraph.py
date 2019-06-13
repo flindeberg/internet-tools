@@ -7,10 +7,8 @@ import matplotlib.pyplot as plt
 import networkx as nx
 
 import harutilities
-
-from typing import List
-
 from harutilities import EdgeType
+
 
 @dataclass
 class DrawWrapper:

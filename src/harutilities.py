@@ -7,6 +7,7 @@ import os
 import re
 import sys
 from dataclasses import dataclass
+from enum import Enum
 from subprocess import call
 from typing import Dict, List, Tuple
 from urllib.parse import urlparse
@@ -14,11 +15,10 @@ from urllib.parse import urlparse
 import cymruwhois
 import DNS
 import pyasn
+import pycountry
 
 from parallelltracert import TraceManager
 
-import pycountry
-from enum import Enum
 
 class EdgeType(Enum):
     start = 0
