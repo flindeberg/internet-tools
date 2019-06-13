@@ -75,7 +75,6 @@ class AS:
         ## d is assumed to come from cymruwhois
         return AS(d.owner,d.asn,d.cc,ip)
 
-
     @classmethod
     def CreateFromPyasnStr(cls, ip: str, asn: int, s: str) -> AS:
         ## create and return basically.
@@ -84,7 +83,7 @@ class AS:
             if country is not None:
                 country = country.name
         else: 
-            country = "Unknown"
+            country = ""
 
         return AS(s,asn,country,ip)
 
@@ -113,14 +112,19 @@ class ASNLookup:
 
         # go through ips and resolve  them
         for ip in ips:
-            # tuple, 0 = asn, 1 = prefix
-            r = self.p.lookup(ip)
-            name = self.p.get_as_name(r[0])
-            asn = AS.CreateFromPyasnStr(ip, r[0], name)
+            try:
+                # tuple, 0 = asn, 1 = prefix
+                r = self.p.lookup(ip)
+                name = self.p.get_as_name(r[0])
+                asn = AS.CreateFromPyasnStr(ip, r[0], name)
 
-            # lets create both dictionaries for now
-            asinfo.ipas[ip] = asn
-            asinfo.asas[r[0]] = asn
+                # lets create both dictionaries for now
+                asinfo.ipas[ip] = asn
+                asinfo.asas[r[0]] = asn
+
+            except ValueError as ve:
+                print("Issues with {:}: {:}".format(ip, ve))
+
 
         return asinfo
 
