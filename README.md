@@ -14,7 +14,7 @@ First off, we need all dependencies
 
 ### Chrome-headless automation
 
-This project is dependent on `chrome-har-capturer` (see https://github.com/cyrus-and/chrome-har-capturer) to captur hars with the help of Google Chrome / Chromium. 
+This project is dependent on `chrome-har-capturer` (see https://github.com/cyrus-and/chrome-har-capturer) to capture hars with the help of Google Chrome / Chromium. 
 
 Chrome or Chromium is easily installed by either your package manager or by googling a download link. As long as the version is relatively modern there should be no issues.
 
@@ -40,7 +40,7 @@ This repository contains tools usable in general python projects, such as (simpl
 
 ### Modules
 
-See `src/` directory, and in particular `tracert.py`, `har_wrapper.py` and `utils.py`. Depending on arguments it might be necessary to run `pyasn_util_download.py --latestv46` in the working directory for `pyasn` sake.
+See `src/` directory, and in particular `generatemap.py`, `parallelltracert.py`, `harutilities.py` and `internetgraph.py`. The har generation is done by `generatehar.sh`, a bash-script, which handles input / output and invokes `chrome-har-capturer` with decent arguments (i.e. timeouts). 
 
 ### Command line tools
 
