@@ -14,7 +14,6 @@ from urllib.parse import urlparse
 
 import cymruwhois
 import DNS
-import pyasn
 import pycountry
 
 from parallelltracert import TraceManager
