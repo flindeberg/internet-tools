@@ -34,6 +34,7 @@ Core module
 Currently only works on OSX, possibly some Linux-flavours, but not guaranteed
 """
 
+import ipaddress
 import os
 import random
 import socket
@@ -43,8 +44,6 @@ import threading
 import time
 ## Use threads, not processes (processes are harder to coordinate for small tasks, also larger overhead)
 from multiprocessing.pool import ThreadPool
-
-import DNS
 
 __all__ = ['MyTracer']
 __tracedebug__ = False
@@ -414,13 +413,13 @@ class MyTracer(object):
 
         try:
             # start with checking if we have an ip (works with ipv4 and ipv6)
-            ip_inner = DNS.ipaddress.ip_address(self.dst)
+            ip_inner = ipaddress.ip_address(self.dst)
             dst_ip = ip_inner
         except Exception as e:
             # resolve hostname to IP
             # does not handle ipv6 (socket.gethostbyname)
             try:
-                ip_inner = DNS.ipaddress.ip_address(socket.gethostbyname(self.dst))
+                ip_inner = ipaddress.ip_address(socket.gethostbyname(self.dst))
                 dst_ip = ip_inner
             except socket.error as e:
                 raise IOError('Unable to resolve {}: {}', self.dst, e)
@@ -555,14 +554,14 @@ class MyTracer(object):
         Returns:
             A socket instance
         """
-        if isinstance(ipvx, DNS.ipaddress.IPv4Address):
+        if isinstance(ipvx, ipaddress.IPv4Address):
             s = socket.socket(
                 family=socket.AF_INET,
                 type=socket.SOCK_DGRAM,
                 proto=socket.IPPROTO_UDP
             )
             s.setsockopt(socket.SOL_IP, socket.IP_TTL, self.ttl)
-        elif isinstance(ipvx, DNS.ipaddress.IPv6Address):
+        elif isinstance(ipvx, ipaddress.IPv6Address):
             s = socket.socket(
                 family=socket.AF_INET6,
                 type=socket.SOCK_DGRAM,
