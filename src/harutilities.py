@@ -79,9 +79,12 @@ class AS:
     @classmethod
     def CreateFromPyasnStr(cls, ip: str, asn: int, s: str) -> AS:
         ## create and return basically.
-        country = pycountry.countries.get(alpha_2=s[-2:])
-        if country is not None:
-            country = country.name
+        if s is not None:
+            country = pycountry.countries.get(alpha_2=s[-2:])
+            if country is not None:
+                country = country.name
+        else: 
+            country = "Unknown"
 
         return AS(s,asn,country,ip)
 
