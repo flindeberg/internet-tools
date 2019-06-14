@@ -27,8 +27,10 @@ mkdir -p $folder
 # start chrome if not running
 if ! (pgrep -x ".*Chrome" > /dev/null) ; then
     echo "Starting Chrome headless"
-    ## TODO, adapt for non-OSX OSes
-    ${browser} --headless --content --disk-cache-dir=/dev/null --disable-gpu --download-whole-document --deterministic-fetch --net-log-capture-mode IncludeCookiesAndCredentials &> /dev/null &
+
+    ## --no-sandbox required for linux and root
+    ##${browser} --remote-debugging-port=9222 --headless --content --disk-cache-dir=/dev/null --disable-gpu --download-whole-document --deterministic-fetch --net-log-capture-mode IncludeCookiesAndCredentials &> /dev/null &
+    ${browser} --remote-debugging-port=9222 --no-sandbox --headless --content --disable-gpu --download-whole-document --deterministic-fetch --net-log-capture-mode IncludeCookiesAndCredentials &> /dev/null &
 
     ## sometimes we have had issues here, sleeping lets Chrome properly boot up
     sleep 2
