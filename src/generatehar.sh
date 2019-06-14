@@ -9,6 +9,18 @@ else
     folder="$2"
 fi
 
+if hash chromium-browser 2>/dev/null; then
+    browser=chromium-browser
+    ## prefer chromium over chrome, obviously..
+    echo "Found chromium-browser on path!"
+elif hash chrome-browser 2>/dev/null; then
+    browser=chrome-browser
+    echo "Found chrome-browser on path!"
+elif hash /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome 2>/dev/null; then
+    browser=/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome
+    echo "Found OSX and Chrome browser"
+fi
+
 # ensure that we have the folder
 mkdir -p $folder
 

@@ -18,9 +18,9 @@ This project is dependent on `chrome-har-capturer` (see https://github.com/cyrus
 
 Chrome or Chromium is easily installed by either your package manager or by googling a download link. As long as the version is relatively modern there should be no issues.
 
-`chrome-har-capturer` is installed via npm like this:
+`chrome-har-capturer` is installed via npm like this (`--global` is needed for the utility to be on `path`):
 
-    npm install chrome-har-capturer
+    npm install --global chrome-har-capturer
 
 If you are missing `npm` head over to https://nodejs.org/en/download/ and download and install `npm` / `nodejs`.
 
@@ -30,7 +30,7 @@ You also need som python modules, and of course python (3+) itself. Python is mo
 
 When you have pip(3) installed, run the following:
 
-    pip3 install networkx matplotlib splinter bs4 cymruwhois dnspython
+    pip3 install networkx matplotlib splinter bs4 pyasn dnspython pycountry
 
 Depending on system pip3 might not be aliased and instead pip should be used. Also some systems might require pip3 to be run as root (or use the `--user` flag to do a user install).
 
