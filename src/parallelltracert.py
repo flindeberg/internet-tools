@@ -28,6 +28,12 @@
 # Available in modified form at:
 # https://github.com/flindeberg/internet-tools
 
+# TODO ipv6
+# ipv6 does not work, feel free to fix it. 
+# Issue is that the ipv6 packet when read as a buffer does not look as it 
+# does on the wire (i.e. when captured by wireshark), so ICMPv6 packets
+# don't have the required fields available.
+
 """
 Core module
 
