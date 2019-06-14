@@ -1,5 +1,7 @@
 # to allow for proper annotations and class structures
 from __future__ import annotations
+# Copyright (c) 2019 Fredrik Lindeberg <flindeberg@gmail.com>
+# All rights reserved.
 
 import functools
 import ipaddress
@@ -14,7 +16,6 @@ from typing import Dict, List, NamedTuple, Tuple
 from urllib.parse import urlparse
 
 import dns.resolver
-#import cymruwhois
 import pyasn
 import pycountry
 
@@ -63,10 +64,16 @@ class EdgeTuple:
 @dataclass
 class AS:
     ### Class to represent-AS entities
-    name: str
-    asn: int
-    cc: str
-    exampleIp: str
+    #self.name: str
+    #self.asn: int
+    #self.cc: str
+    #self.exampleIp: str
+
+    def __init__(self, name : str, asn : int, cc : str, exampleIp : str):
+        self.name = name
+        self.asn = asn
+        self.cc = cc
+        self.exampleIp = exampleIp
 
     @classmethod
     def CreateFromDict(cls, ip, d) -> AS: 
@@ -85,6 +92,11 @@ class AS:
             country = ""
 
         return AS(s,asn,country,ip)
+
+    def GetPrettyName(self) -> str:
+        ## Gets a pretty representation of the AS
+        ## for now "AS full name (ASN)", i.g. "Google LLC (1234)"
+        return "{:} ({:})".format(self.name, self.asn)
 
 ## Type aliases
 AsList = List[AS]
@@ -339,8 +351,6 @@ class CheckHAR:
 
             locallistips = list()
 
-            #DNS.DnsAsyncRequest.
-
             # go through all the hosts we use, and check paths and asns passed to get there
             for h in self.result.hosts:
                 try:
@@ -349,12 +359,14 @@ class CheckHAR:
                     #ips = DNS.dnslookup(h, "a")
                     ips = (a.address for a in dns.resolver.query(h, "A"))
                     # IPv6 fails in the tracer. So lets skip it for now
-                    #ips6 = DNS.dnslookup(h, "aaaa")
+                    #ips6 = (a.address for a in dns.resolver.query(h, "AAAA"))
                     #if ips6 is not None:
                     #    ips.extend(ips6)
 
                     for ip in ips:
                         try:
+                            ## dnspython v2 vs v1.5 has different behaviour here, lets keep backwards comp
+
                             ## ip_inner is thrown and useless, but we need to check if "ip" is an actual ip 
                             ## in terms of format, and not a host (as the case in a cname -> cname -> a chain)
                             ip_inner = ipaddress.ip_address(ip)
@@ -364,15 +376,20 @@ class CheckHAR:
                             self.ipname[ip_inner.exploded] = h
 
                         except ValueError as e:
+                            ## Probably a host (e.g. xxx.yyy.zzz.akamai.com or so via cname)
                             print("Not an IP, skipping: {:} ({:})".format(ip, e))
                         except TypeError as e:
+                            ## Something else is fishy
                             print("Not an IP, skipping: {:} ({:})".format(ip, e))
                         except:
                             print("Unexpected error:", sys.exc_info())
                    
                 except:
+                    # DNS resolution messed up, such as host cannot be resolved
                     print("Unexpected error:", sys.exc_info()[0])
                     print("Unexpected error:", sys.exc_info())
+                    ## put it in the list, that way we still keep it even though we could not resolve it
+                    self.ipname[h] = h
 
             ## only host ips
             r = self.GetAsList(locallistips)
@@ -427,6 +444,7 @@ class CheckHAR:
         """
 
         ## local network counter
+        ## we should only get one, keeping as sanity check
         i = 1
 
         # make sure we get the right list to start with
@@ -516,9 +534,9 @@ class CheckHAR:
                     if country is not None:
                         cc = country.name
 
-                    reverselist.append(EdgeTuple(cc, str(left.name), EdgeType.cc, EdgeType.asn, edgeType=EdgeType.cc, data=left.asn))
+                    reverselist.append(EdgeTuple(cc, left.GetPrettyName(), EdgeType.cc, EdgeType.asn, edgeType=EdgeType.cc, data=left.asn))
 
-                left = left.name
+                left = left.GetPrettyName()
                 lefttype = EdgeType.asn
             elif left in self.ipname and useHostnames:
                 ## convert ip to hostname
@@ -533,9 +551,9 @@ class CheckHAR:
                     if country is not None:
                         cc = country.name
 
-                    reverselist.append(EdgeTuple(cc, str(right.name), EdgeType.cc, EdgeType.asn, edgeType=EdgeType.cc, data=right.asn))
+                    reverselist.append(EdgeTuple(cc, right.GetPrettyName(), EdgeType.cc, EdgeType.asn, edgeType=EdgeType.cc, data=right.asn))
 
-                right = right.name
+                right = right.GetPrettyName()
                 righttype = EdgeType.asn
             elif right in self.ipname and useHostnames:
                 ## convert ip to hostname
@@ -566,7 +584,7 @@ class CheckHAR:
         return self.result.requests
 
     def PrettyPrint(self):
-        print("Report for " + self.result.file)
+        print("Report for {:}".format(self.result.file))
         print("Nr of cookies: " + str(len(self.GetCookies())))
         print("Nr of hosts: " + str(len(self.GetHosts())))
         print("Nr of asns: " + str(len(self.GetAsns())))
@@ -577,4 +595,4 @@ class CheckHAR:
         return self.result
 
 if __name__ == "__main__":
-    print ("Running as main")
+    print ("Running utilities as main, not really useful")
