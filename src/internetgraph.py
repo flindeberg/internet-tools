@@ -1,3 +1,6 @@
+# Copyright (c) 2019 Fredrik Lindeberg <flindeberg@gmail.com>
+# All rights reserved.
+
 import math
 from dataclasses import dataclass
 from itertools import chain

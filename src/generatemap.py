@@ -1,4 +1,8 @@
 #!/bin/python3
+
+# Copyright (c) 2019 Fredrik Lindeberg <flindeberg@gmail.com>
+# All rights reserved.
+
 import argparse
 import os
 import subprocess
@@ -101,7 +105,7 @@ def main(arg=None):
                     chartname = tochart
                 
             if not args.quiet:
-                print("Open the graph")
+                print("Opening the graph (might take a while for big graphs)")
                 os.system("open " + chartname)
 
 def CreateFolder(args):
