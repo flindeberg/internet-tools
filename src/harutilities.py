@@ -13,7 +13,6 @@ from subprocess import call
 from typing import Dict, List, NamedTuple, Tuple
 from urllib.parse import urlparse
 
-import DNS
 import dns.resolver
 #import cymruwhois
 import pyasn

@@ -9,6 +9,18 @@ else
     folder="$2"
 fi
 
+if hash chromium-browser 2>/dev/null; then
+    browser=chromium-browser
+    ## prefer chromium over chrome, obviously..
+    echo "Found chromium-browser on path!"
+elif hash chrome-browser 2>/dev/null; then
+    browser=chrome-browser
+    echo "Found chrome-browser on path!"
+elif hash /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome 2>/dev/null; then
+    browser=/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome
+    echo "Found OSX and Chrome browser"
+fi
+
 # ensure that we have the folder
 mkdir -p $folder
 
@@ -16,7 +28,8 @@ mkdir -p $folder
 if ! (pgrep -x ".*Chrome" > /dev/null) ; then
     echo "Starting Chrome headless"
     ## TODO, adapt for non-OSX OSes
-    /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222 --headless --content --disk-cache-dir=/dev/null --disable-gpu --download-whole-document --deterministic-fetch --net-log-capture-mode IncludeCookiesAndCredentials &> /dev/null &
+    ${browser} --headless --content --disk-cache-dir=/dev/null --disable-gpu --download-whole-document --deterministic-fetch --net-log-capture-mode IncludeCookiesAndCredentials &> /dev/null &
+
     ## sometimes we have had issues here, sleeping lets Chrome properly boot up
     sleep 2
 fi
