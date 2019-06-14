@@ -16,9 +16,15 @@ if hash chromium-browser 2>/dev/null; then
 elif hash chrome-browser 2>/dev/null; then
     browser=chrome-browser
     echo "Found chrome-browser on path!"
-elif hash /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome 2>/dev/null; then
+elif command -v /Applications/Chromium.app/Contents/MacOS/Chromium 2>/dev/null; then
+    browser=/Applications/Chromium.app/Contents/MacOS/Chromium
+    echo "Found OSX and Chromium browser"
+elif command -v /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome 2>/dev/null; then
     browser=/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome
     echo "Found OSX and Chrome browser"
+else
+    echo "No compatible browser found!"
+    return 1
 fi
 
 # ensure that we have the folder
