@@ -134,7 +134,7 @@ class ASNLookup:
                 asinfo.asas[r[0]] = asn
 
             except ValueError as ve:
-                print("Issues with {:}: {:}".format(ip, ve))
+                print("Issues with ip-address '{:}': {:}".format(ip, ve))
 
 
         return asinfo
