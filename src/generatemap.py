@@ -12,6 +12,8 @@ from itertools import chain
 from pathlib import Path
 from shutil import copyfile
 
+from elevate import elevate
+
 import harutilities
 import internetgraph
 from harutilities import urlutils
@@ -162,7 +164,16 @@ def CreateHarFile(tmpfile, tmpdir : str):
     harfullname = os.path.join(tmpdir,harfilename)
     return harfilename, harfullname
 
+def is_root():
+    return os.getuid() == 0
+
 if __name__ == "__main__":
+    
+    if not is_root():
+        # check for root and elevate
+        print("Not root, restarting as root")
+        elevate(show_console=False, graphical=False)
+        
     ## call main 
     main()
 else:

@@ -31,7 +31,7 @@ fi
 mkdir -p $folder
 
 # start chrome if not running
-if ! (pgrep -x ".*Chrome" > /dev/null) ; then
+if ! (pgrep -x ".*Chrom.*" > /dev/null) ; then
     echo "Starting Chrome headless"
 
     ## --no-sandbox required for linux and root
@@ -40,6 +40,8 @@ if ! (pgrep -x ".*Chrome" > /dev/null) ; then
 
     ## sometimes we have had issues here, sleeping lets Chrome properly boot up
     sleep 2
+else
+    echo "Did not start headless browser, trying to use existing"
 fi
     
 # Give each page 20 sec to load in total, and wait 3 sec after load
