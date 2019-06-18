@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 ## first argument is input file
 ## second argument is output folder
 
@@ -32,7 +32,7 @@ mkdir -p $folder
 
 # start chrome if not running
 if ! (pgrep -x ".*Chrom.*" > /dev/null) ; then
-    echo "Starting Chrome headless"
+    echo "Starting headless browser ($browser)"
 
     ## --no-sandbox required for linux and root
     ##${browser} --remote-debugging-port=9222 --headless --content --disk-cache-dir=/dev/null --disable-gpu --download-whole-document --deterministic-fetch --net-log-capture-mode IncludeCookiesAndCredentials &> /dev/null &
