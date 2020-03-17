@@ -8,7 +8,7 @@ In particular these functions are of interest:
 
 Depends heavily on other python modules and a contains a modified version of py-traceroute (https://github.com/dnaeon/pytraceroute).
 
-And a word of warning, this repository exists to show code used in my thesis, not primarily so others can reuse this. The code quality as aweful, use at your own risk :-)
+And a word of warning, this repository exists to show code used in my thesis, not primarily so others can reuse this. The code quality as awful, use at your own risk :-)
 
 ## Installation instructions
 
