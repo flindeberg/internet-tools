@@ -46,7 +46,7 @@ See `src/` directory, and in particular `generatemap.py`, `parallelltracert.py`,
 
 ### Command line tools
 
-The most interesting tool to use quickly is the `generate_map.py`, which generates a map / graph from either a list of urls or a set of har-files. Due to the nature of the traceroute (modifying packets at low level) root-acccess is required. On most systems this can be attained with `sudo`.
+The most interesting tool to use quickly is the `generate_map.py`, which generates a map / graph from either a list of urls or a set of har-files. Due to the nature of the traceroute (modifying packets at low level) root-acccess is required. On most systems this can be attained with `sudo`. This meanst that *you* should make sure that you understand what the Python-script does before running it).
 
 Some example usages:
 
