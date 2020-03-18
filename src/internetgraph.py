@@ -90,11 +90,14 @@ def draw_graph(graph: harutilities.EdgeList, file: str, graph_layout='spring'):
     # Create wrappers for the different types
     # also set drawing rules (colors, etc)
     wrappers = dict()
-    wrappers[EdgeType.asn] = DrawWrapper(list(set(nodelist[EdgeType.asn])), edges[EdgeType.asn], "ASN", "o", textsize=4, nodesize=300, color="red")
-    wrappers[EdgeType.cc] = DrawWrapper(list(set(nodelist[EdgeType.cc])), edges[EdgeType.cc], "Countries", "d", textsize=5, nodesize=400, color="green")
+    # static wrappers (start, hosts and indirect hosts)
     wrappers[EdgeType.ihost] = DrawWrapper(list(set(nodelist[EdgeType.ihost])), edges[EdgeType.ihost], "Indirect hosts", "o", textsize=3, nodesize=100, color="skyblue")
     wrappers[EdgeType.host] = DrawWrapper(list(set(nodelist[EdgeType.host])), edges[EdgeType.host], "Hosts", "o", textsize=3, nodesize=100, color="blue")
     wrappers[EdgeType.start] = DrawWrapper(nodelist[EdgeType.start], edges[EdgeType.start], "Start", "p", textsize=4, nodesize=160, color="yellow")
+
+    # dynamic wrappers, i.e. asn per cc
+    wrappers[EdgeType.asn] = DrawWrapper(list(set(nodelist[EdgeType.asn])), edges[EdgeType.asn], "ASN", "o", textsize=4, nodesize=300, color="red")
+    wrappers[EdgeType.cc] = DrawWrapper(list(set(nodelist[EdgeType.cc])), edges[EdgeType.cc], "Countries", "d", textsize=5, nodesize=400, color="green")
 
     # these are different layouts for the network you may try
     # shell seems to work best
@@ -112,7 +115,7 @@ def draw_graph(graph: harutilities.EdgeList, file: str, graph_layout='spring'):
     ## set size before draw
     # lets scale with the square of number of nodes
     # (i.e. space per node stays constant)
-    figs = int(math.sqrt(len(nodes)))
+    figs = int(math.sqrt(len(nodes))) + 2
     plt.figure(figsize=(figs, figs))
 
     # generic defaults

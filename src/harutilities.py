@@ -349,6 +349,10 @@ class CheckHAR:
             # get unique list, this is done via set
             self.result.hosts = list(set(self.result.hosts))
 
+            print("Parser had, loaded {:} hosts".format(len(self.result.hosts)))
+            # for entry in self.result.hosts:
+            #    print(entry)    
+
             locallistips = list()
 
             # go through all the hosts we use, and check paths and asns passed to get there
@@ -391,6 +395,11 @@ class CheckHAR:
                     ## put it in the list, that way we still keep it even though we could not resolve it
                     self.ipname[h] = h
 
+            # IPs we have found resources at 
+            print("IP-addresses we have found resources at:")
+            for ip in set(locallistips):
+                print(ip)
+
             ## only host ips
             r = self.GetAsList(locallistips)
             self.result.asns = r.asas.values()
@@ -398,9 +407,16 @@ class CheckHAR:
             # lets trace them all (requires root)
             tracedIps = TraceManager.TraceAll(locallistips)
 
+            # traced ips
+            #print(tracedIps)
+
             # get a dict describing it
             self.result.hostTraceMap = dict(zip(locallistips, tracedIps))
-            # remove the unknowns
+
+            # hosttracemap
+            #print(self.result.hostTraceMap)
+
+            # remove the unknown hosts
             if "*" in self.result.hostTraceMap.keys():
                 del self.result.hostTraceMap["*"]
 
@@ -419,11 +435,22 @@ class CheckHAR:
             for tip in self.result.hostTraceMap.keys():
                 filtered = list(filter(lambda x: x != "*",self.result.hostTraceMap[tip]))
 
+                print("filtered")
+                print(filtered)
+
                 ## hostmap has hosts only
                 ## asnmap has localhost, asns in the middle and hosts at the edges
                 self.result.hostTraceMap[tip] = filtered
                 self.result.asnTraceMap[tip] = list()
                 for item in self.result.hostTraceMap[tip]:
+                    print(item)
+                    print(self.asndict[item].name)
+
+                    tmpas = self.asndict[item]
+                    if tmpas.name is None:
+                        self.asndict[item].name = "N/A" 
+                        self.asndict[item].asn = item
+
                     self.result.asnTraceMap[tip].append(self.asndict[item])
                     ## TODO debug info
                     if item == "localhost":
