@@ -93,10 +93,14 @@ class AS:
 
         return AS(s,asn,country,ip)
 
+
     def GetPrettyName(self) -> str:
         ## Gets a pretty representation of the AS
         ## for now "AS full name (ASN)", i.g. "Google LLC (1234)"
         return "{:} ({:})".format(self.name, self.asn)
+
+    def __str__(self):
+        return self.GetPrettyName()
 
 ## Type aliases
 AsList = List[AS]
@@ -349,7 +353,7 @@ class CheckHAR:
             # get unique list, this is done via set
             self.result.hosts = list(set(self.result.hosts))
 
-            print("Parser had, loaded {:} hosts".format(len(self.result.hosts)))
+            print("Parser loaded, {:} hosts in total".format(len(self.result.hosts)))
             # for entry in self.result.hosts:
             #    print(entry)    
 
@@ -396,9 +400,8 @@ class CheckHAR:
                     self.ipname[h] = h
 
             # IPs we have found resources at 
-            print("IP-addresses we have found resources at:")
-            for ip in set(locallistips):
-                print(ip)
+            print("IP-addresses we have found resources at (duplicates removed):")
+            print(set(locallistips))
 
             ## only host ips
             r = self.GetAsList(locallistips)
@@ -435,27 +438,60 @@ class CheckHAR:
             for tip in self.result.hostTraceMap.keys():
                 filtered = list(filter(lambda x: x != "*",self.result.hostTraceMap[tip]))
 
-                print("filtered")
-                print(filtered)
-
                 ## hostmap has hosts only
                 ## asnmap has localhost, asns in the middle and hosts at the edges
                 self.result.hostTraceMap[tip] = filtered
                 self.result.asnTraceMap[tip] = list()
                 for item in self.result.hostTraceMap[tip]:
-                    print(item)
-                    print(self.asndict[item].name)
-
                     tmpas = self.asndict[item]
                     if tmpas.name is None:
                         self.asndict[item].name = "N/A" 
                         self.asndict[item].asn = item
+
+                    if self.asndict[item].name == "N/A":
+                        print("{:} is not announced by an AS".format(item))
 
                     self.result.asnTraceMap[tip].append(self.asndict[item])
                     ## TODO debug info
                     if item == "localhost":
                         print("localhost found {:}".format(self.result.hostTraceMap[tip]))
 
+                ## Merge unknown AS into one for better overview
+                last = None
+                tracaslist = list()
+                for item in self.result.asnTraceMap[tip]:
+                    if last == None:
+                        last = item
+                        continue
+
+                    # Check for match, if both N/A we have two unknown in a row, lets merge
+                    if last.name == "N/A" and item.name == "N/A":
+                        last.asn = "{:}, {:}".format(last.asn, item.asn)
+                        last.asn = last.asn[:30] + (last.asn[30:] and '..')
+                        # now we "drop" item by not carrying it over in last
+                    else:
+                        # We append and continue.
+                        tracaslist.append(last)
+                        last = item
+
+                ## add last
+                tracaslist.append(last)
+
+
+                #Update list    
+                print("Updating trace map, new:")
+                for ele in tracaslist:
+                    print(ele, sep=" -- ", end=" -- ")
+
+                print("")
+                print("--- end new --- start Old ---")
+                for ele in self.result.asnTraceMap[tip]:
+                    print(ele, sep=" -- ", end=" -- ")
+
+                print("")
+                print("--- end old ---")
+
+                self.result.asnTraceMap[tip] = tracaslist
 
             # filter it so we only have unique values
             # asns where we fetched resources
@@ -568,7 +604,6 @@ class CheckHAR:
             elif left in self.ipname and useHostnames:
                 ## convert ip to hostname
                 left = self.ipname[left]
-
 
             if isinstance(right, AS):
                 ## replace AS with str

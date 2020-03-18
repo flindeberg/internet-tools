@@ -7,6 +7,8 @@ from itertools import chain
 from typing import Dict, List
 
 import matplotlib.pyplot as plt
+import matplotlib.colors as clr
+import matplotlib.cm as cm
 import networkx as nx
 
 import harutilities
@@ -28,6 +30,15 @@ class DrawWrapper:
         # return a label dictionary
         return {n:n for n in self.nodes}
 
+    def HasLabels(self) -> bool:
+        return self.nodes is not None
+
+    def HasNodes(self) -> bool:
+        return self.nodes is not None
+
+    def HasEdges(self) -> bool:
+        return self.edges is not None
+
 def is_digit(x):
     # check if it is a digit
     return (isinstance(x, str) and x.isdigit()) or isinstance(x, int)
@@ -40,7 +51,16 @@ def is_integer(x):
     # check if input is integer
     return type(x) is int
 
+def get_color(nr: int, all: int):
+    # some magic to crate a redish hue mixed with some color
+    fact = float(nr) / float(all)
+    return list(cm.autumn(fact))
+    #return (0.7, float(nr) / float(all), 1.0 - float(nr) / float(all))
+
 def draw_graph(graph: harutilities.EdgeList, file: str, graph_layout='spring'):
+
+    # just dump it
+    #print(graph)
 
     # create networkx graph
     G=nx.Graph()
@@ -95,9 +115,28 @@ def draw_graph(graph: harutilities.EdgeList, file: str, graph_layout='spring'):
     wrappers[EdgeType.host] = DrawWrapper(list(set(nodelist[EdgeType.host])), edges[EdgeType.host], "Hosts", "o", textsize=3, nodesize=100, color="blue")
     wrappers[EdgeType.start] = DrawWrapper(nodelist[EdgeType.start], edges[EdgeType.start], "Start", "p", textsize=4, nodesize=160, color="yellow")
 
+    # add those without country
+    nodelist[EdgeType.asn] = set(nodelist[EdgeType.asn])
+
+    # figure out the number of countries involved (on paper), if any
+    countries = set(t.node1 for t in filter(lambda x: x.edgeType == EdgeType.cc, graph))
+    index = 0
+    for country in countries:
+        ASNs = set(t.node2 for t in filter(lambda x: x.edgeType == EdgeType.cc and x.node1 == country, graph))
+        
+        for AS in ASNs:
+            if AS in nodelist[EdgeType.asn]:
+                nodelist[EdgeType.asn].remove(AS) 
+
+        wrappers[country + "_ASN"] = DrawWrapper(ASNs, None, "ASN", "o", textsize=4, nodesize=300, color=get_color(index, len(countries)))
+        # wrappers[country + "_CC"] = DrawWrapper(list(set(nodelist[EdgeType.cc])), edges[EdgeType.cc], "Countries", "d", textsize=5, nodesize=400, color=get_color(index, len(countries)))
+        index = index + 1
+        
+
     # dynamic wrappers, i.e. asn per cc
     wrappers[EdgeType.asn] = DrawWrapper(list(set(nodelist[EdgeType.asn])), edges[EdgeType.asn], "ASN", "o", textsize=4, nodesize=300, color="red")
     wrappers[EdgeType.cc] = DrawWrapper(list(set(nodelist[EdgeType.cc])), edges[EdgeType.cc], "Countries", "d", textsize=5, nodesize=400, color="green")
+    #wrappers["ASNedges"] = DrawWrapper(None, edges[EdgeType.asn], "ASN", "o", textsize=4, nodesize=300, color="red")
 
     # these are different layouts for the network you may try
     # shell seems to work best
@@ -126,19 +165,22 @@ def draw_graph(graph: harutilities.EdgeList, file: str, graph_layout='spring'):
 
     # draw edges
     for i in wrappers.values():
-         nx.draw_networkx_edges(G,graph_pos,width=edge_tickness, edgelist=i.edges,
-                           alpha=edge_alpha,edge_color=i.color)
+        if i.HasEdges():
+            nx.draw_networkx_edges(G,graph_pos,width=edge_tickness, edgelist=i.edges,
+                                   alpha=edge_alpha,edge_color=i.color)
 
     # draw nodes
     for i in wrappers.values(): 
-        nx.draw_networkx_nodes(G,graph_pos,node_size=i.nodesize, nodelist=i.nodes, node_shape=i.shape,
-                           alpha=node_alpha, node_color=i.color, label=i.label)
+        if i.HasNodes():
+            nx.draw_networkx_nodes(G,graph_pos,node_size=i.nodesize, nodelist=i.nodes, node_shape=i.shape,
+                                   alpha=node_alpha, node_color=i.color, label=i.label)
 
    
     # draw labels
     for i in wrappers.values(): 
-        nx.draw_networkx_labels(G, graph_pos, labels=i.LabelDict(),font_size=i.textsize,
-                            font_family=text_font)
+        if i.HasLabels():
+            nx.draw_networkx_labels(G, graph_pos, labels=i.LabelDict(),font_size=i.textsize,
+                                    font_family=text_font)
 
 
     plt.axis('off')   
