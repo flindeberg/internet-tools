@@ -120,7 +120,8 @@ def draw_graph(graph: harutilities.EdgeList, file: str, graph_layout='spring'):
 
     # figure out the number of countries involved (on paper), if any
     countries = set(t.node1 for t in filter(lambda x: x.edgeType == EdgeType.cc, graph))
-    index = 0
+    index = 1
+    index_tot = len(countries) + 1
     for country in countries:
         ASNs = set(t.node2 for t in filter(lambda x: x.edgeType == EdgeType.cc and x.node1 == country, graph))
         
@@ -128,7 +129,7 @@ def draw_graph(graph: harutilities.EdgeList, file: str, graph_layout='spring'):
             if AS in nodelist[EdgeType.asn]:
                 nodelist[EdgeType.asn].remove(AS) 
 
-        wrappers[country + "_ASN"] = DrawWrapper(ASNs, None, "ASN", "o", textsize=4, nodesize=300, color=get_color(index, len(countries)))
+        wrappers[country + "_ASN"] = DrawWrapper(ASNs, None, "ASN", "o", textsize=4, nodesize=300, color=get_color(index, index_tot))
         # wrappers[country + "_CC"] = DrawWrapper(list(set(nodelist[EdgeType.cc])), edges[EdgeType.cc], "Countries", "d", textsize=5, nodesize=400, color=get_color(index, len(countries)))
         index = index + 1
         

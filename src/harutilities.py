@@ -448,8 +448,8 @@ class CheckHAR:
                         self.asndict[item].name = "N/A" 
                         self.asndict[item].asn = item
 
-                    if self.asndict[item].name == "N/A":
-                        print("{:} is not announced by an AS".format(item))
+                    #if self.asndict[item].name == "N/A":
+                    #    print("{:} is not announced by an AS".format(item))
 
                     self.result.asnTraceMap[tip].append(self.asndict[item])
                     ## TODO debug info
@@ -466,8 +466,11 @@ class CheckHAR:
 
                     # Check for match, if both N/A we have two unknown in a row, lets merge
                     if last.name == "N/A" and item.name == "N/A":
-                        last.asn = "{:}, {:}".format(last.asn, item.asn)
-                        last.asn = last.asn[:30] + (last.asn[30:] and '..')
+                        # create a new object, so we don't modify other references
+                        newasn = AS(item.name, 1, item.cc, None)
+                        newasn.asn = "{:}, {:}".format(last.asn, item.asn)
+                        newasn.asn = last.asn[:30] + (last.asn[30:] and '..')
+                        last = newasn
                         # now we "drop" item by not carrying it over in last
                     else:
                         # We append and continue.
@@ -477,19 +480,18 @@ class CheckHAR:
                 ## add last
                 tracaslist.append(last)
 
-
                 #Update list    
-                print("Updating trace map, new:")
-                for ele in tracaslist:
-                    print(ele, sep=" -- ", end=" -- ")
+                # print("Updating trace map, new:")
+                # for ele in tracaslist:
+                #     print(ele, sep=" -- ", end=" -- ")
 
-                print("")
-                print("--- end new --- start Old ---")
-                for ele in self.result.asnTraceMap[tip]:
-                    print(ele, sep=" -- ", end=" -- ")
+                # print("")
+                # print("--- end new --- start Old ---")
+                # for ele in self.result.asnTraceMap[tip]:
+                #     print(ele, sep=" -- ", end=" -- ")
 
-                print("")
-                print("--- end old ---")
+                # print("")
+                # print("--- end old ---")
 
                 self.result.asnTraceMap[tip] = tracaslist
 
