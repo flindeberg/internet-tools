@@ -100,18 +100,21 @@ class TraceManager(object):
         
 
     @classmethod
-    def TraceAll(cls, ips: list) -> list:
+    def TraceAll(cls, ips: list) -> dict:
         dprint ("in trace all")
         ins = cls.Instance()
         dprint ("got instance")
-        results = list()
+        results = dict()
 
         for i in ips:
             dprint("(MAIN) Starting {}".format(i))
-            results.append(cls.__pool.apply_async(ins.Trace,  (i,)))
+            results[i] = cls.__pool.apply_async(ins.Trace,  (i,))
+            #results.append(cls.__pool.apply_async(ins.Trace,  (i,)))
 
         dprint("(MAIN) Waiting for results")
-        results = list([r.get() for r in results])
+        #results = list([r.get() for r in results])
+        for key, ele in ips:
+            results[key] = ele.get()
         dprint("(MAIN) Results fetched")
 
         print("(MAIN) We have traced {:} and have {:} tracing.".format(len(ins.__traced.keys()),len(ins.__tracing)))

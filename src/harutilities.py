@@ -33,7 +33,7 @@ class EdgeType(Enum):
 class urlutils:
 
     @staticmethod
-    def GetHostFromString(text: str) -> str:
+    def GetHostFromString(text: str):
         matches = re.findall('https?://.*?/', text,re.MULTILINE)
         parsedhost = ('{uri.netloc}'.format(uri=r) for r in (urlparse(line) for line in matches))
         return parsedhost
@@ -143,13 +143,105 @@ class ASNLookup:
 
         return asinfo
 
+class HarHost:
+    """ Class for storing host information, such as data transferred """
+    def __init__(self, host, transfersize : int = -1, realsize : int = -1):
+        self._host = host
+        self._transfersize = transfersize
+        self._realsize = realsize
+        self._ipstrace = dict()
+
+    @property 
+    def ips(self):
+        return self._ipstrace.keys()
+
+    def get_trace(self, ip: str):
+        return self._ipstrace[ip]
+
+    @property
+    def host(self):
+        return self._host
+
+    @property
+    def size(self):
+        if self._realsize > 0:
+            return self._realsize
+        else:
+            return self._transfersize
+
+    def merge(self, otherHost : HarHost):
+        "merges other host into this host instance"
+        if self._host != otherHost.host():
+            raise ValueError("Hosts do not match!")
+
+        self._transfersize += otherHost._transfersize
+        self._realsize += otherHost._realsize
+
+    def resolve(self):
+        """Resolves this harhost via dns.resolver.query (dnspython).
+            TODO Strategy pattern so we can change resolver if needed
+
+        Args:
+            None
+
+        Returns:
+            Nothing
+
+        Raises:
+            Nothing
+
+        """
+
+        try:
+            ## find both a (ipv4) and aaaa (ipv6) records
+            ##dns.resolver
+            #ips = DNS.dnslookup(h, "a")
+            ips = (a.address for a in dns.resolver.query(self._host, "A"))
+            # IPv6 fails in the tracer. So lets skip it for now
+            #ips6 = (a.address for a in dns.resolver.query(h, "AAAA"))
+            #if ips6 is not None:
+            #    ips.extend(ips6)
+
+            for ip in ips:
+                try:
+                    ## dnspython v2 vs v1.5 has different behaviour here, lets keep backwards comp
+
+                    ## ip_inner is thrown and useless, but we need to check if "ip" is an actual ip 
+                    ## in terms of format, and not a host (as the case in a cname -> cname -> a chain)
+                    ip_inner = ipaddress.ip_address(ip)
+                    ## here we know it is an ip
+                    ## locallistips.append(ip_inner.exploded)
+                    ## cache so we can do a reverse lookup quick
+                    #ipname[ip_inner.exploded] = h.host
+
+                    ## add it to the host as well
+                    self._ipstrace[ip_inner.exploded] = None
+
+                except ValueError as e:
+                    ## Probably a host (e.g. xxx.yyy.zzz.akamai.com or so via cname)
+                    print("Not an IP, skipping: {:} ({:})".format(ip, e))
+                except TypeError as e:
+                    ## Something else is fishy
+                    print("Not an IP, skipping: {:} ({:})".format(ip, e))
+                except:
+                    print("Unexpected error:", sys.exc_info())
+            
+        except:
+            # DNS resolution messed up, such as host cannot be resolved
+            print("Unexpected error:", sys.exc_info()[0])
+            print("Unexpected error:", sys.exc_info())
+            ## put it in the list, that way we still keep it even though we could not resolve it
+            #ipname[self._host] = self._host
+
+HostDict = Dict[str, HarHost]
+
 class HarResult:
     """ Class for storing data from har request """
 
     def __init__(self, file):
         # Do nothing!
         self._cookies = []
-        self._hosts = []
+        self._hosts = dict()
         # all as with resources
         self._asns = []
         # all as we have traversed
@@ -160,7 +252,6 @@ class HarResult:
         self._hostTraceMap = None
         self._asnTraceMap = dict()
 
-   
     def hasTime(self):
         return self._start != None
 
@@ -342,9 +433,19 @@ class CheckHAR:
 
             for entry in d["log"]["entries"]:
                 parsedhost = urlutils.GetHostFromString(entry["request"]["url"])
+                realsize = entry["request"]["headerSize"] + entry["request"]["bodySize"] + entry["response"]["headerSize"] + entry["response"]["bodySize"]
+                transfersize = entry["request"]["_transferSize"]
 
                 for h in parsedhost:
-                    self.result.hosts.append(h)
+                    ## Create a host object matching the host
+                    hh = HarHost(h,transfersize=transfersize, realsize=realsize)
+
+                    ## if we have the host, just update it
+                    ## if we don't, add it
+                    if h in self.result.hosts:
+                        self.result.hosts[h].merge(hh)
+                    else:
+                        self.result.hosts[h] = hh
 
                 # Add all the cookies
                 self.result.cookies.extend(entry["request"]["cookies"])
@@ -352,64 +453,31 @@ class CheckHAR:
 
             # magic done with hosts
             # get unique list, this is done via set
-            self.result.hosts = list(set(self.result.hosts))
+            # should be unnessecary now
+            ## self.result.hosts = list(set(self.result.hosts))
 
             print("Parser loaded, {:} hosts in total".format(len(self.result.hosts)))
             # for entry in self.result.hosts:
             #    print(entry)    
 
-            locallistips = list()
+            #locallistips = list()
 
             # go through all the hosts we use, and check paths and asns passed to get there
-            for h in self.result.hosts:
-                try:
-                    ## find both a (ipv4) and aaaa (ipv6) records
-                    dns.resolver
-                    #ips = DNS.dnslookup(h, "a")
-                    ips = (a.address for a in dns.resolver.query(h, "A"))
-                    # IPv6 fails in the tracer. So lets skip it for now
-                    #ips6 = (a.address for a in dns.resolver.query(h, "AAAA"))
-                    #if ips6 is not None:
-                    #    ips.extend(ips6)
-
-                    for ip in ips:
-                        try:
-                            ## dnspython v2 vs v1.5 has different behaviour here, lets keep backwards comp
-
-                            ## ip_inner is thrown and useless, but we need to check if "ip" is an actual ip 
-                            ## in terms of format, and not a host (as the case in a cname -> cname -> a chain)
-                            ip_inner = ipaddress.ip_address(ip)
-                            ## here we know it is an ip
-                            locallistips.append(ip_inner.exploded)
-                            ## cache so we can do a reverse lookup quick
-                            self.ipname[ip_inner.exploded] = h
-
-                        except ValueError as e:
-                            ## Probably a host (e.g. xxx.yyy.zzz.akamai.com or so via cname)
-                            print("Not an IP, skipping: {:} ({:})".format(ip, e))
-                        except TypeError as e:
-                            ## Something else is fishy
-                            print("Not an IP, skipping: {:} ({:})".format(ip, e))
-                        except:
-                            print("Unexpected error:", sys.exc_info())
-                   
-                except:
-                    # DNS resolution messed up, such as host cannot be resolved
-                    print("Unexpected error:", sys.exc_info()[0])
-                    print("Unexpected error:", sys.exc_info())
-                    ## put it in the list, that way we still keep it even though we could not resolve it
-                    self.ipname[h] = h
+            for hh in self.result.hosts:
+                hh.resolve(self.ipname)
 
             # IPs we have found resources at 
             print("IP-addresses we have found resources at (duplicates removed):")
-            print(set(locallistips))
+            print(set(hh.ips for hh in self.result.hosts))
 
             ## only host ips
-            r = self.GetAsList(locallistips)
-            self.result.asns = r.asas.values()
+            ## remove for now
+            #r = self.GetAsList(locallistips)
+            #self.result.asns = r.asas.values()
 
             # lets trace them all (requires root)
-            tracedIps = TraceManager.TraceAll(locallistips)
+            # returns dict <ip , list of traces>
+            tracedIps = TraceManager.TraceAll(set(hh.ips for hh in self.result.hosts))
 
             # traced ips
             #print(tracedIps)
