@@ -469,7 +469,7 @@ class CheckHAR:
                         # create a new object, so we don't modify other references
                         newasn = AS(item.name, 1, item.cc, None)
                         newasn.asn = "{:}, {:}".format(last.asn, item.asn)
-                        newasn.asn = last.asn[:30] + (last.asn[30:] and '..')
+                        newasn.asn = newasn.asn[:30] + (newasn.asn[30:] and '..')
                         last = newasn
                         # now we "drop" item by not carrying it over in last
                     else:
