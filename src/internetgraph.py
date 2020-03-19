@@ -80,7 +80,7 @@ def draw_graph(graph: harutilities.EdgeList, file: str, graph_layout='spring'):
         length = 4
         if edge.edgeType == EdgeType.cc:
             # lower weight for country codes
-            weight = 1
+            weight = 2
             length = 2
         elif edge.edgeType == EdgeType.asn:
             weight = 1.5
@@ -134,7 +134,7 @@ def draw_graph(graph: harutilities.EdgeList, file: str, graph_layout='spring'):
             if AS in nodelist[EdgeType.asn]:
                 nodelist[EdgeType.asn].remove(AS) 
 
-        wrappers[country + "_ASN"] = DrawWrapper(ASNs, None, "ASN", "o", textsize=4, nodesize=300, color=get_color(index, index_tot))
+        wrappers[country + "_ASN" if country else "unknown_ASN"] = DrawWrapper(ASNs, None, "ASN", "o", textsize=4, nodesize=300, color=get_color(index, index_tot))
         # TODO Draw countries here as well, ie match color for AS and country diamonds
         # wrappers[country + "_CC"] = DrawWrapper(list(set(nodelist[EdgeType.cc])), edges[EdgeType.cc], "Countries", "d", textsize=5, nodesize=400, color=get_color(index, len(countries)))
         index = index + 1

@@ -329,6 +329,7 @@ class CheckHAR:
     def Load(self, file):
         # these are reloaded per HAR-file
 
+        # some stupid string magic to keep compatability with earlier scripts
         self.result = HarResult(os.path.basename(file).replace(".har","").replace("www.",""))
 
         with open(file) as json_data:
@@ -422,6 +423,10 @@ class CheckHAR:
             # remove the unknown hosts
             if "*" in self.result.hostTraceMap.keys():
                 del self.result.hostTraceMap["*"]
+
+
+            if len(tracedIps) == 0:
+                raise ValueError("We have ended up with 0(!) hosts, should not happen, check input!")
 
             # get asns from ips
             allIps = functools.reduce(list.__add__, tracedIps)
