@@ -171,7 +171,7 @@ class HarHost:
 
     def merge(self, otherHost : HarHost):
         "merges other host into this host instance"
-        if self._host != otherHost.host():
+        if self._host != otherHost.host:
             raise ValueError("Hosts do not match!")
 
         self._transfersize += otherHost._transfersize
@@ -232,6 +232,16 @@ class HarHost:
             print("Unexpected error:", sys.exc_info())
             ## put it in the list, that way we still keep it even though we could not resolve it
             #ipname[self._host] = self._host
+
+    def trace(self):
+        """
+            Does a trace route for all applicable IPS
+            TODO Add support for IPv6, currently failing due to unknown reasons
+        """
+        traces = TraceManager.TraceAll(self.ips)
+        for key in traces:
+            self._ipstrace[key] = traces[key]
+
 
 HostDict = Dict[str, HarHost]
 
@@ -433,8 +443,8 @@ class CheckHAR:
 
             for entry in d["log"]["entries"]:
                 parsedhost = urlutils.GetHostFromString(entry["request"]["url"])
-                realsize = entry["request"]["headerSize"] + entry["request"]["bodySize"] + entry["response"]["headerSize"] + entry["response"]["bodySize"]
-                transfersize = entry["request"]["_transferSize"]
+                realsize = entry["request"]["headersSize"] + entry["request"]["bodySize"] + entry["response"]["headersSize"] + entry["response"]["bodySize"]
+                transfersize = entry["response"]["_transferSize"]
 
                 for h in parsedhost:
                     ## Create a host object matching the host
@@ -463,12 +473,18 @@ class CheckHAR:
             #locallistips = list()
 
             # go through all the hosts we use, and check paths and asns passed to get there
-            for hh in self.result.hosts:
-                hh.resolve(self.ipname)
+            print("Starting to resolve hosts")
+            for key in self.result.hosts:
+                self.result.hosts[key].resolve()
 
             # IPs we have found resources at 
             print("IP-addresses we have found resources at (duplicates removed):")
-            print(set(hh.ips for hh in self.result.hosts))
+            print(list(self.result.hosts[hh].ips for hh in self.result.hosts.keys()))
+
+            # Make sure we trace all ips
+            print("Starting to trace hosts")
+            for key in self.result.hosts:
+                self.result.hosts[key].trace()
 
             ## only host ips
             ## remove for now
@@ -477,7 +493,7 @@ class CheckHAR:
 
             # lets trace them all (requires root)
             # returns dict <ip , list of traces>
-            tracedIps = TraceManager.TraceAll(set(hh.ips for hh in self.result.hosts))
+            #tracedIps = TraceManager.TraceAll(set(hh.ips for hh in self.result.hosts))
 
             # traced ips
             #print(tracedIps)
