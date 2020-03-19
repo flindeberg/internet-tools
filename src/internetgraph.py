@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as clr
 import matplotlib.cm as cm
 import networkx as nx
+import numpy as np
 
 import harutilities
 from harutilities import EdgeType
@@ -54,8 +55,10 @@ def is_integer(x):
 def get_color(nr: int, all: int):
     # some magic to crate a redish hue mixed with some color
     fact = float(nr) / float(all)
-    return list(cm.autumn(fact))
-    #return (0.7, float(nr) / float(all), 1.0 - float(nr) / float(all))
+    ## a bit fo magic to create a 2-d vector
+    ## needed for numpy colors
+    res = np.array(cm.autumn(fact))[None, :]
+    return res
 
 def draw_graph(graph: harutilities.EdgeList, file: str, graph_layout='spring'):
 
@@ -120,6 +123,8 @@ def draw_graph(graph: harutilities.EdgeList, file: str, graph_layout='spring'):
 
     # figure out the number of countries involved (on paper), if any
     countries = set(t.node1 for t in filter(lambda x: x.edgeType == EdgeType.cc, graph))
+    # index is used for coloring, color "0" is already taken by "IP not announced and insterad put inautomagic AS" 
+    # (harutils create "virtual" AS where multiple hosts / IPs are bundled together to make the graph nicer)
     index = 1
     index_tot = len(countries) + 1
     for country in countries:
@@ -130,6 +135,7 @@ def draw_graph(graph: harutilities.EdgeList, file: str, graph_layout='spring'):
                 nodelist[EdgeType.asn].remove(AS) 
 
         wrappers[country + "_ASN"] = DrawWrapper(ASNs, None, "ASN", "o", textsize=4, nodesize=300, color=get_color(index, index_tot))
+        # TODO Draw countries here as well, ie match color for AS and country diamonds
         # wrappers[country + "_CC"] = DrawWrapper(list(set(nodelist[EdgeType.cc])), edges[EdgeType.cc], "Countries", "d", textsize=5, nodesize=400, color=get_color(index, len(countries)))
         index = index + 1
         
@@ -137,6 +143,8 @@ def draw_graph(graph: harutilities.EdgeList, file: str, graph_layout='spring'):
     # dynamic wrappers, i.e. asn per cc
     wrappers[EdgeType.asn] = DrawWrapper(list(set(nodelist[EdgeType.asn])), edges[EdgeType.asn], "ASN", "o", textsize=4, nodesize=300, color="red")
     wrappers[EdgeType.cc] = DrawWrapper(list(set(nodelist[EdgeType.cc])), edges[EdgeType.cc], "Countries", "d", textsize=5, nodesize=400, color="green")
+
+    # All AS same color
     #wrappers["ASNedges"] = DrawWrapper(None, edges[EdgeType.asn], "ASN", "o", textsize=4, nodesize=300, color="red")
 
     # these are different layouts for the network you may try
