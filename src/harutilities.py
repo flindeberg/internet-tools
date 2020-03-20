@@ -23,6 +23,8 @@ import pycountry
 from parallelltracert import TraceManager
 import edgeutils
 import asnutils
+from edgeutils import EdgeTuple, EdgeType
+from asnutils import AS
 
 ## Manipulation of string and urls
 class urlutils:
@@ -44,8 +46,8 @@ class HarHost:
         self._host = host
         self._transfersize = transfersize
         self._realsize = realsize
-        self._ipstrace = dict()
-        self._astrace = dict()
+        self._ipstrace = dict() # str -> list[str]
+        self._astrace = dict() # str -> list[AS]
 
     @property 
     def ips(self):
@@ -111,6 +113,7 @@ class HarHost:
                     #ipname[ip_inner.exploded] = h.host
 
                     ## add it to the host as well
+                    ## store it in the dict, which we populate later
                     self._ipstrace[ip_inner.exploded] = None
 
                 except ValueError as e:
@@ -127,8 +130,7 @@ class HarHost:
             print("Unexpected error:", sys.exc_info()[0])
             print("Unexpected error:", sys.exc_info())
             ## put it in the list, that way we still keep it even though we could not resolve it
-            #ipname[self._host] = self._host
-
+            
     def trace(self):
         """
             Does a trace route for all applicable IPS
@@ -144,26 +146,21 @@ class HarHost:
             Looks up ASNS data
         """
 
+        # get an instance of the util, and look up the necessary ips
         asn = asnutils.ASNLookup()
-
+        # many will just have one ip, but for those which have many we will trace many
         for key in self.ips:
             asinfo = asn.lookupmany(self._ipstrace[key])
-
+        
             # build a new list of visited AS along the line
             self._astrace[key] = list()
 
             for ip in self._ipstrace[key]:
                 # fetch the matching AS, it might be "bad", i.e. missing name if it doesn't exist
                 refas = asinfo.ipas[ip]
+                self._astrace[key].append(refas)
 
-                if refas.name == None:
-                    ## We have internal AS, prolly, lets look it up
-                    ## TODO Something missing here
-                    None
-            
-
-
-HostDict = Dict[str, HarHost]
+HostDict = Dict[ipaddress._BaseAddress, HarHost]
 
 class HarResult:
     """ Class for storing data from har request """
@@ -219,11 +216,11 @@ class HarResult:
         self._cookies = value
 
     @property
-    def hosts(self):
+    def hosts(self) -> Dict[str, HarHost]:
         return self._hosts
 
     @hosts.setter
-    def hosts(self, value):
+    def hosts(self, value : Dict[str, HarHost]):
         self._hosts = value
 
     @property
@@ -398,20 +395,20 @@ class CheckHAR:
 
             # IPs we have found resources at 
             print("IP-addresses we have found resources at (duplicates removed):")
-            print(list(self.result.hosts[hh].ips for hh in self.result.hosts.keys()))
+            print(list(self.result.hosts[hh].ips for hh in self.result.hosts))
 
             # Make sure we trace all ips
             print("Starting to trace hosts")
             for key in self.result.hosts:
                 self.result.hosts[key].trace()
 
-            # remove the unknown hosts
-            if "*" in self.result.hostTraceMap.keys():
-                del self.result.hostTraceMap["*"]
+            # Now we have all hosts, their traceroutes (hopefully somewhat populated), 
+            # now it is time to resolve their autonomous systems
+            print("Starting to resolve autonomous systems")
+            for key in self.result.hosts:
+                self.result.hosts[key].populateAsns()
 
-
-            #if len(tracedIps) == 0:
-            #    raise ValueError("We have ended up with 0(!) hosts, should not happen, check input!")
+           
 
             # get asns from ips
             allIps = functools.reduce(list.__add__, tracedIps)
@@ -653,5 +650,17 @@ if __name__ == "__main__":
     
     ## example trace, one local, one well known, and DNs
     trace = ("2.18.74.134", ["192.168.0.1", "8.8.8.8", "2.18.74.134"])
+    
+    hosts = ["www.dn.se", "www.svd.se", "www.happygreen.com"]
+    
+    hh = HarHost("www.dn.se")
+    print("Starting to resolve")
+    hh.resolve()
+    
+    print("Starting to trace")
+    hh.trace()
+    
+    print("Starting to populate asns")
+    hh.populateAsns()
     
     

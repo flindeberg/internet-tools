@@ -398,6 +398,9 @@ class MyTracer(object):
         except KeyError as ke:
             # probably due to accessing wrong key in the dict
             print ("listener got KeyError: {:}".format(ke))
+        except PermissionError as pe:
+            print ("Permission error, we cannot trace, re raising")
+            raise pe
         except:
             # should not happen any more
             print ("Unexpected error in listener: {:}".format(sys.exc_info()[0]))
