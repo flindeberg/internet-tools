@@ -405,24 +405,6 @@ class CheckHAR:
             for key in self.result.hosts:
                 self.result.hosts[key].trace()
 
-            ## only host ips
-            ## remove for now
-            #r = self.GetAsList(locallistips)
-            #self.result.asns = r.asas.values()
-
-            # lets trace them all (requires root)
-            # returns dict <ip , list of traces>
-            #tracedIps = TraceManager.TraceAll(set(hh.ips for hh in self.result.hosts))
-
-            # traced ips
-            #print(tracedIps)
-
-            # get a dict describing it
-            #self.result.hostTraceMap = dict(zip(locallistips, tracedIps))
-
-            # hosttracemap
-            #print(self.result.hostTraceMap)
-
             # remove the unknown hosts
             if "*" in self.result.hostTraceMap.keys():
                 del self.result.hostTraceMap["*"]

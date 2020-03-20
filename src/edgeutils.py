@@ -1,4 +1,5 @@
-
+from enum import Enum
+from dataclasses import dataclass
 
 class EdgeType(Enum):
     start = 0
