@@ -113,8 +113,8 @@ class TraceManager(object):
 
         dprint("(MAIN) Waiting for results")
         #results = list([r.get() for r in results])
-        for key, ele in ips:
-            results[key] = ele.get()
+        for key in ips:
+            results[key] = results[key].get()
         dprint("(MAIN) Results fetched")
 
         print("(MAIN) We have traced {:} and have {:} tracing.".format(len(ins.__traced.keys()),len(ins.__tracing)))

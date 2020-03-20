@@ -116,21 +116,49 @@ class AsInfo(NamedTuple):
 class ASNLookup:
     """ Class for looking up ASN data """
     # currently based on pyasn, and has to be. They have the correct data
+    __p = pyasn.pyasn("pyasn.dat", "pyasn.json")
+    
+    __urlrdap = "https://rdap.arin.net/registry/ip/{:}"
 
     def __init__(self):
         # load all names and pyas
-        self.p = pyasn.pyasn("pyasn.dat", "pyasn.json")
+        #self.p = pyasn.pyasn("pyasn.dat", "pyasn.json")
+        None
+        
 
     def lookupmany(self, ips: List[str]) -> AsInfo:
         
         asinfo = AsInfo()
-
+        
         # go through ips and resolve  them
         for ip in ips:
             try:
-                # tuple, 0 = asn, 1 = prefix
-                r = self.p.lookup(ip)
-                name = self.p.get_as_name(r[0])
+                ip_class = ipaddress.IPv4Address(ip)
+
+                # Sanity checks so we know what to do
+                if ip_class.is_global():
+                    # we have a an IP which is global, i.e. should
+                    # be routable
+                    # tuple, 0 = asn, 1 = prefix
+                    r = __p.lookup(ip)
+                elif ip_class.is_link_local():
+                    
+                
+                
+                ## TODO already here, check that it is a good ip via ipaddress class
+                ## i.e. not local, or otherwise reserved
+
+                if r[0] == None and r[1] == None:
+                    ## We do not have this ASN / prefix
+                    ## Lets create it
+                    url = __urlrdap.format(ip)
+                    with urllib.request.urlopen(url) as rdapl:
+                        data = json.loads(rdap.read().decode())
+                        ## handle json
+
+                    
+
+                name = __p.get_as_name(r[0])
                 asn = AS.CreateFromPyasnStr(ip, r[0], name)
 
                 # lets create both dictionaries for now
@@ -150,10 +178,11 @@ class HarHost:
         self._transfersize = transfersize
         self._realsize = realsize
         self._ipstrace = dict()
+        self._astrace = dict()
 
     @property 
     def ips(self):
-        return self._ipstrace.keys()
+        return list(str(key) for key in self._ipstrace.keys())
 
     def get_trace(self, ip: str):
         return self._ipstrace[ip]
@@ -240,7 +269,29 @@ class HarHost:
         """
         traces = TraceManager.TraceAll(self.ips)
         for key in traces:
-            self._ipstrace[key] = traces[key]
+            ## Save the filtered list (i.e. we do not care about missing steps)
+            self._ipstrace[key] = list(filter(lambda x: x != "*", traces[key]))
+
+    def populateAsns(self):
+        """
+            Looks up ASNS data
+        """
+
+        asn = ASNLookup()
+
+        for key in self.ips:
+            asinfo = asn.lookupmany(self._ipstrace[key])
+
+            # build a new list of visited AS along the line
+            self._astrace[key] = list()
+
+            for ip in self._ipstrace[key]:
+                # fetch the matching AS, it might be "bad", i.e. missing name if it doesn't exist
+                refas = asinfo.ipas[ip]
+
+                if refas.name == None:
+                    ## We have internal AS, prolly, lets look it up
+            
 
 
 HostDict = Dict[str, HarHost]
@@ -401,7 +452,6 @@ class Utils:
 class CheckHAR:
     """Class for managing HAR-files"""
 
-
     def __init__(self): #, res: resolver.Resolver):
         # noting
         None
@@ -499,7 +549,7 @@ class CheckHAR:
             #print(tracedIps)
 
             # get a dict describing it
-            self.result.hostTraceMap = dict(zip(locallistips, tracedIps))
+            #self.result.hostTraceMap = dict(zip(locallistips, tracedIps))
 
             # hosttracemap
             #print(self.result.hostTraceMap)
@@ -509,8 +559,8 @@ class CheckHAR:
                 del self.result.hostTraceMap["*"]
 
 
-            if len(tracedIps) == 0:
-                raise ValueError("We have ended up with 0(!) hosts, should not happen, check input!")
+            #if len(tracedIps) == 0:
+            #    raise ValueError("We have ended up with 0(!) hosts, should not happen, check input!")
 
             # get asns from ips
             allIps = functools.reduce(list.__add__, tracedIps)
