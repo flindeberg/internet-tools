@@ -143,9 +143,8 @@ class ASNLookup:
                     # tuple, 0 = asn, 1 = prefix
                     r = __p.lookup(ip)
                 elif ip_class.is_link_local():
-                    
-                
-                
+                    None    
+                     
                 ## TODO already here, check that it is a good ip via ipaddress class
                 ## i.e. not local, or otherwise reserved
 
@@ -153,10 +152,9 @@ class ASNLookup:
                     ## We do not have this ASN / prefix
                     ## Lets create it
                     url = __urlrdap.format(ip)
-                    with urllib.request.urlopen(url) as rdapl:
+                    with urllib.request.urlopen(url) as rdap:
                         data = json.loads(rdap.read().decode())
                         ## handle json
-
                     
 
                 name = __p.get_as_name(r[0])

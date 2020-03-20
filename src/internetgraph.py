@@ -15,7 +15,6 @@ import numpy as np
 import harutilities
 from harutilities import EdgeType
 
-
 @dataclass
 class DrawWrapper:
     ## Contains nodes, colors, sizes etc
