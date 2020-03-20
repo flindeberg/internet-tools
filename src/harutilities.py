@@ -19,15 +19,10 @@ import dns.resolver
 import pyasn
 import pycountry
 
+## local imports
 from parallelltracert import TraceManager
-
-
-class EdgeType(Enum):
-    start = 0
-    ihost = 1
-    host = 2
-    asn = 3
-    cc = 4
+import edgeutils
+import asnutils
 
 ## Manipulation of string and urls
 class urlutils:
@@ -42,133 +37,6 @@ class urlutils:
     def EnsureFullURI(text: str) -> str:
         ## reparse so have have an explicit http
         return urlparse(text, "http").geturl()
-        
-
-
-@dataclass
-class EdgeTuple:
-    ### Class to represent edges before drawing them
-    ## Contains necessary meta-information
-    node1: object
-    node2: object
-    node1type: EdgeType = None
-    node2type: EdgeType = None
-    edgeType: EdgeType = None
-    data: object = None
-
-    def __hash__(self):
-        return self.node1.__hash__() + self.node2.__hash__() + self.edgeType.__hash__()
-
-    def __eq__(self, x):
-        return self.__hash__() == x.__hash__()
-
-@dataclass
-class AS:
-    ### Class to represent-AS entities
-    #self.name: str
-    #self.asn: int
-    #self.cc: str
-    #self.exampleIp: str
-
-    def __init__(self, name : str, asn : int, cc : str, exampleIp : str):
-        self.name = name
-        self.asn = asn
-        self.cc = cc
-        self.exampleIp = exampleIp
-
-    @classmethod
-    def CreateFromDict(cls, ip, d) -> AS: 
-        ## just create and return
-        ## d is assumed to come from cymruwhois
-        return AS(d.owner,d.asn,d.cc,ip)
-
-    @classmethod
-    def CreateFromPyasnStr(cls, ip: str, asn: int, s: str) -> AS:
-        ## create and return basically.
-        if s is not None:
-            country = pycountry.countries.get(alpha_2=s[-2:])
-            if country is not None:
-                country = country.name
-        else: 
-            country = ""
-
-        return AS(s,asn,country,ip)
-
-
-    def GetPrettyName(self) -> str:
-        ## Gets a pretty representation of the AS
-        ## for now "AS full name (ASN)", i.g. "Google LLC (1234)"
-        return "{:} ({:})".format(self.name, self.asn)
-
-    def __str__(self):
-        return self.GetPrettyName()
-
-## Type aliases
-AsList = List[AS]
-EdgeList = List[EdgeTuple]
-AsDict = Dict[int, AS]
-IpAsDict = Dict[str, AS]
-
-class AsInfo(NamedTuple):
-    ipas: AsDict = dict()
-    asas: IpAsDict = dict()
-
-
-class ASNLookup:
-    """ Class for looking up ASN data """
-    # currently based on pyasn, and has to be. They have the correct data
-    __p = pyasn.pyasn("pyasn.dat", "pyasn.json")
-    
-    __urlrdap = "https://rdap.arin.net/registry/ip/{:}"
-
-    def __init__(self):
-        # load all names and pyas
-        #self.p = pyasn.pyasn("pyasn.dat", "pyasn.json")
-        None
-        
-
-    def lookupmany(self, ips: List[str]) -> AsInfo:
-        
-        asinfo = AsInfo()
-        
-        # go through ips and resolve  them
-        for ip in ips:
-            try:
-                ip_class = ipaddress.IPv4Address(ip)
-
-                # Sanity checks so we know what to do
-                if ip_class.is_global():
-                    # we have a an IP which is global, i.e. should
-                    # be routable
-                    # tuple, 0 = asn, 1 = prefix
-                    r = __p.lookup(ip)
-                elif ip_class.is_link_local():
-                    None    
-                     
-                ## TODO already here, check that it is a good ip via ipaddress class
-                ## i.e. not local, or otherwise reserved
-
-                if r[0] == None and r[1] == None:
-                    ## We do not have this ASN / prefix
-                    ## Lets create it
-                    url = __urlrdap.format(ip)
-                    with urllib.request.urlopen(url) as rdap:
-                        data = json.loads(rdap.read().decode())
-                        ## handle json
-                    
-
-                name = __p.get_as_name(r[0])
-                asn = AS.CreateFromPyasnStr(ip, r[0], name)
-
-                # lets create both dictionaries for now
-                asinfo.ipas[ip] = asn
-                asinfo.asas[r[0]] = asn
-
-            except ValueError as ve:
-                print("Issues with ip-address '{:}': {:}".format(ip, ve))
-
-
-        return asinfo
 
 class HarHost:
     """ Class for storing host information, such as data transferred """
@@ -276,7 +144,7 @@ class HarHost:
             Looks up ASNS data
         """
 
-        asn = ASNLookup()
+        asn = asnutils.ASNLookup()
 
         for key in self.ips:
             asinfo = asn.lookupmany(self._ipstrace[key])
@@ -290,6 +158,8 @@ class HarHost:
 
                 if refas.name == None:
                     ## We have internal AS, prolly, lets look it up
+                    ## TODO Something missing here
+                    None
             
 
 
@@ -464,7 +334,7 @@ class CheckHAR:
         #ipsasndict = cymruClient.lookupmany_dict(l)
         #asnlist = []
 
-        asnlookup = ASNLookup()
+        asnlookup = asnutils.ASNLookup()
 
         return asnlookup.lookupmany(l)
 
@@ -798,3 +668,8 @@ class CheckHAR:
 
 if __name__ == "__main__":
     print ("Running utilities as main, not really useful")
+    
+    ## example trace, one local, one well known, and DNs
+    trace = ("2.18.74.134", ["192.168.0.1", "8.8.8.8", "2.18.74.134"])
+    
+    
