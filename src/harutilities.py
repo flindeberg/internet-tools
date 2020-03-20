@@ -1,6 +1,6 @@
 # to allow for proper annotations and class structures
 from __future__ import annotations
-# Copyright (c) 2019 Fredrik Lindeberg <flindeberg@gmail.com>
+# Copyright (c) 2019, 2020 Fredrik Lindeberg <flindeberg@gmail.com>
 # All rights reserved.
 
 import functools
@@ -29,7 +29,7 @@ class EdgeType(Enum):
     asn = 3
     cc = 4
 
-# Manipulation of string and urls
+## Manipulation of string and urls
 class urlutils:
 
     @staticmethod
@@ -42,6 +42,7 @@ class urlutils:
     def EnsureFullURI(text: str) -> str:
         ## reparse so have have an explicit http
         return urlparse(text, "http").geturl()
+        
 
 
 @dataclass
