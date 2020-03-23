@@ -114,7 +114,7 @@ class HarHost:
 
                     ## add it to the host as well
                     ## store it in the dict, which we populate later
-                    self._ipstrace[ip_inner.exploded] = None
+                    self._ipstrace[ip_inner] = None
 
                 except ValueError as e:
                     ## Probably a host (e.g. xxx.yyy.zzz.akamai.com or so via cname)
@@ -136,10 +136,13 @@ class HarHost:
             Does a trace route for all applicable IPS
             TODO Add support for IPv6, currently failing due to unknown reasons
         """
+        ## TODO Tracemanager does not handle IP class!
         traces = TraceManager.TraceAll(self.ips)
         for key in traces:
             ## Save the filtered list (i.e. we do not care about missing steps)
-            self._ipstrace[key] = list(filter(lambda x: x != "*", traces[key]))
+            filtered = list(filter(lambda x: x != "*", traces[key]))
+            iplist = list(ipaddress.ip_address(x) for x in filtered)
+            self._ipstrace[ipaddress.ip_address(key)] = iplist
 
     def populateAsns(self):
         """
@@ -149,14 +152,15 @@ class HarHost:
         # get an instance of the util, and look up the necessary ips
         asn = asnutils.ASNLookup()
         # many will just have one ip, but for those which have many we will trace many
-        for key in self.ips:
-            asinfo = asn.lookupmany(self._ipstrace[key])
+        for key in self._ipstrace:
+            asinfo = asn.lookupmanystr(self._ipstrace[key])
         
             # build a new list of visited AS along the line
             self._astrace[key] = list()
 
             for ip in self._ipstrace[key]:
                 # fetch the matching AS, it might be "bad", i.e. missing name if it doesn't exist
+                
                 refas = asinfo.ipas[ip]
                 self._astrace[key].append(refas)
 

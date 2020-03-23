@@ -166,16 +166,32 @@ class ASNLookup:
                 ## handle json
                 start = ipaddress.ip_address(data["startAddress"]) #ip
                 end = ipaddress.ip_address(data["endAddress"]) #ip
-                asns = data["arin_originas0_originautnums"] # list
-                ## create and add to unannounced
-                asf = ASFind(asns, start, end)
-                ASNLookup.__unannounced.append(asf)
-                
-                ## update our internal mappings
-                asn = AS.CreateFromPyasnStr(ip, asns[0], ASNLookup.__p.get_as_name(asns[0]))
-                asinfo.ipas[ip] = asn
-                asinfo.asas[asns[0]] = asn
-                print("Added {:} ({:}) which covers {:} to {:}".format(asn.name, asn.asn, start.exploded, end.exploded))
+                if "arin_originas0_originautnums" in data:
+                  asns = data["arin_originas0_originautnums"] # list
+                  
+                  ## create and add to unannounced
+                  asf = ASFind(asns, start, end)
+                  ASNLookup.__unannounced.append(asf)
+                  
+                  ## update our internal mappings
+                  asn = AS.CreateFromPyasnStr(ip, asns[0], ASNLookup.__p.get_as_name(asns[0]))
+                  asinfo.ipas[ip] = asn
+                  asinfo.asas[asns[0]] = asn
+                  print("Added {:} ({:}) which covers {:} to {:}".format(asn.name, asn.asn, start.exploded, end.exploded))
+                  
+                else:
+                  # we do not have an ASN!
+                  asns = None
+                  
+                  ## create and add to unannounced even if we do not have it
+                  asf = ASFind(asns, start, end)
+                  ASNLookup.__unannounced.append(asf)
+                  
+                  ## update our internal mappings
+                  asn = AS.CreateFromPyasnStr(ip, -1, "Unnanouced")
+                  asinfo.ipas[ip] = asn
+                  asinfo.asas[asns[0]] = asn
+                  print("Added {:} ({:}) which covers {:} to {:}".format(asn.name, asn.asn, start.exploded, end.exploded))
                 
           elif r[0] == None or r[1] == None:
             ## We don't know this case, lets crash
