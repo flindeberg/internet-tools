@@ -138,11 +138,11 @@ class HarHost:
             TODO Add support for IPv6, currently failing due to unknown reasons
         """
         ## TODO Tracemanager does not handle IP class!
-        print("Tracing:")
-        pprint.pprint(self.ips)
+        #print("Tracing:")
+        #pprint.pprint(self.ips)
         traces = TraceManager.TraceAll(self.ips)
-        print("Got traces")
-        pprint.pprint(traces)
+        #print("Got traces")
+        #pprint.pprint(traces)
         for key in traces:
             ## Save the filtered list (i.e. we do not care about missing steps)
             filtered = list(filter(lambda x: x != "*", traces[key]))
@@ -169,7 +169,7 @@ class HarHost:
                 refas = asinfo.ipas[ip]
                 self._astrace[key].append(refas)
                 
-    def getedges(self):
+    def getedges(self) -> asnutils.EdgeList:
         """
             Get a list of edges from the current host object. 
             Edges are entities made for graphing, and as such contain much less data than the HarHost object
@@ -279,7 +279,7 @@ class HarResult:
         self._hostTraceMap = value
     
     @property
-    def asnTraceMap(self) -> Dict[str,AsList]:
+    def asnTraceMap(self) -> Dict[str,asnutils.AsList]:
         return self._asnTraceMap
 
     @asnTraceMap.setter
@@ -304,19 +304,19 @@ class HarResult:
         self._hosts = value
 
     @property
-    def asns(self) -> AsList:
+    def asns(self) -> asnutils.List:
         return self._asns
 
     @asns.setter
-    def asns(self, value: AsList):
+    def asns(self, value: asnutils.AsList):
         self._asns = value
 
     @property
-    def asnsAll(self) -> AsList:
+    def asnsAll(self) -> asnutils.AsList:
         return self._asnsAll
 
     @asnsAll.setter
-    def asnsAll(self, value: AsList):
+    def asnsAll(self, value: asnutils.AsList):
         self._asnsAll = value
 
     @property
@@ -404,7 +404,7 @@ class CheckHAR:
         self.nameip = dict()
         self.ipname = dict()
     
-    def GetAsList(self, l : List[str]) -> AsInfo:
+    def GetAsList(self, l : List[str]) -> asnutils.AsInfo:
         #cymruClient = cymruwhois.Client()
         ## lookupmany only takes ip, so we have to convert from asn to ip and back..
         ## enumerate the list, else we get issues "sometimes"
@@ -440,7 +440,10 @@ class CheckHAR:
             for entry in d["log"]["entries"]:
                 parsedhost = urlutils.GetHostFromString(entry["request"]["url"])
                 realsize = entry["request"]["headersSize"] + entry["request"]["bodySize"] + entry["response"]["headersSize"] + entry["response"]["bodySize"]
-                transfersize = entry["response"]["_transferSize"]
+                if "_transferSize" in entry["response"]:
+                    transfersize = entry["response"]["_transferSize"]
+                else:
+                    transfersize = 0
 
                 for h in parsedhost:
                     ## Create a host object matching the host
@@ -475,7 +478,9 @@ class CheckHAR:
 
             # IPs we have found resources at 
             print("IP-addresses we have found resources at (duplicates removed):")
-            print(list(self.result.hosts[hh].ips for hh in self.result.hosts))
+            edges = set([ip for key in self.result.hosts 
+                              for ip in self.result.hosts[key].ips])
+            #print(set(self.result.hosts[hh].ips for hh in self.result.hosts))
 
             # Make sure we trace all ips
             print("Starting to trace hosts")
@@ -488,221 +493,14 @@ class CheckHAR:
             for key in self.result.hosts:
                 self.result.hosts[key].populateAsns()
 
-           
+    def getEdges(self, dohosts: bool = False, useHostnames: bool = False) -> asnutils.EdgeList:
 
-            # get asns from ips
-            # allIps = functools.reduce(list.__add__, tracedIps)
-            # ## now we get all ips, store all as and the ipas dict separately
-            # r = self.GetAsList(list(set(allIps)))
-            # self.result.asnsAll = r.asas.values()
-            # self.asndict = r.ipas
 
-            # # add a fake localhost in local network
-            # self.asndict["localhost"] = AS("local network", "NA", "", "10.0.0.1")
+            print("Constructing edges from routing information")
+            # force a set so we dont get duplicates
+            edges = set([edge for key in self.result.hosts for edge in self.result.hosts[key].getedges()])
 
-            # # get hosts and ips
-            # # Gettings asns
-            # for tip in self.result.hostTraceMap.keys():
-            #     filtered = list(filter(lambda x: x != "*",self.result.hostTraceMap[tip]))
-
-            #     ## hostmap has hosts only
-            #     ## asnmap has localhost, asns in the middle and hosts at the edges
-            #     self.result.hostTraceMap[tip] = filtered
-            #     self.result.asnTraceMap[tip] = list()
-            #     for item in self.result.hostTraceMap[tip]:
-            #         tmpas = self.asndict[item]
-            #         if tmpas.name is None:
-            #             self.asndict[item].name = "N/A" 
-            #             self.asndict[item].asn = item
-
-            #         #if self.asndict[item].name == "N/A":
-            #         #    print("{:} is not announced by an AS".format(item))
-
-            #         self.result.asnTraceMap[tip].append(self.asndict[item])
-            #         ## TODO debug info
-            #         if item == "localhost":
-            #             print("localhost found {:}".format(self.result.hostTraceMap[tip]))
-
-            #     ## Merge unknown AS into one for better overview
-            #     last = None
-            #     tracaslist = list()
-            #     for item in self.result.asnTraceMap[tip]:
-            #         if last == None:
-            #             last = item
-            #             continue
-
-            #         # Check for match, if both N/A we have two unknown in a row, lets merge
-            #         if last.name == "N/A" and item.name == "N/A":
-            #             # create a new object, so we don't modify other references
-            #             newasn = AS(item.name, 1, item.cc, None)
-            #             newasn.asn = "{:}, {:}".format(last.asn, item.asn)
-            #             newasn.asn = newasn.asn[:30] + (newasn.asn[30:] and '..')
-            #             last = newasn
-            #             # now we "drop" item by not carrying it over in last
-            #         else:
-            #             # We append and continue.
-            #             tracaslist.append(last)
-            #             last = item
-
-            #     ## add last
-            #     tracaslist.append(last)
-
-            #     #Update list    
-            #     # print("Updating trace map, new:")
-            #     # for ele in tracaslist:
-            #     #     print(ele, sep=" -- ", end=" -- ")
-
-            #     # print("")
-            #     # print("--- end new --- start Old ---")
-            #     # for ele in self.result.asnTraceMap[tip]:
-            #     #     print(ele, sep=" -- ", end=" -- ")
-
-            #     # print("")
-            #     # print("--- end old ---")
-
-            #     self.result.asnTraceMap[tip] = tracaslist
-
-            # # filter it so we only have unique values
-            # # asns where we fetched resources
-            # self.result.asns = self.result.asns
-            # # asns included those we were routed through
-            # self.result.asnsAll = self.result.asnsAll
-
-            # #print ("ASNS: {:} TOTAL ASNS {:}".format(len(self.result.asns), len(self.result.asnsAll)))
-
-    def getEdges(self, dohosts: bool = False, useHostnames: bool = False) -> EdgeList:
-        """
-            Function for getting the edges for drawing a graph out of a HarResult
-        """
-
-        ## local network counter
-        ## we should only get one, keeping as sanity check
-        i = 1
-
-        
-        # make sure we get the right list to start with
-        # TODO Remove?
-        if dohosts:
-            currentList = self.result.hostTraceMap
-        else:
-            currentList = self.result.asnTraceMap
-
-        # the list of tuples we are going to return
-        listTuples = list()
-
-        for key in self.result.hosts:
-            edges = self.result.hosts[key].getedges()
-
-        ## current list is a dict<ip,list<trace>>
-        for key in currentList.keys():
-            # get the first and make it special
-            current = "localhost"
-            
-            for point in currentList[key]:
-                if point == None:
-                    # If we don't have a nice value just continue
-                    continue
-   
-                listTuples.append((current, point))
-
-                current = point
-            
-            #if current != harRes.hostTraceMap[key][-1]:
-                # i.e we are doing asn trace
-                # then we apply the last host manually
-                #listTuples.append((current,harRes.hostTraceMap[key][-1]))
-
-            if current != key:
-                # the last host didn't respond to ping
-                # so we add it manually
-                listTuples.append((current,key))
-
-        ## Go through and change IPs into hostnames
-        ## lets just cached lookups from previous
-        reverselist = list()
-        for element in listTuples:
-            ## element is a tuple of ips and / or asn.
-            left = element[0]
-            right = element[1]
-
-            et = EdgeType.ihost # assume indirect host
-            lefttype = EdgeType.ihost
-            righttype = EdgeType.ihost
-
-            if (isinstance(left, AS) and left.asn == "NA"):
-                ## fix it, its local network
-                print ("local network found: {:}".format(left))
-                left.name = "local network {:}".format(i)
-                i += 1
-                print ("local network found: {:}".format(left))
-
-            if (isinstance(right, AS) and right.asn == "NA"):
-                ## fix it, its local network
-                print ("local network found: {:}".format(right))
-                right.name = "local network {:}".format(i)
-                i += 1
-                print ("local network found: {:}".format(right))
-
-            if isinstance(left, AS) and isinstance(right, AS):
-                # edgetype is between as:es
-                et = EdgeType.asn
-            elif isinstance(left, AS): 
-                # right is host
-                if right in self.asndict.keys() and left.asn == self.asndict[right].asn:
-                    et = EdgeType.host
-                    righttype = EdgeType.host
-                    
-            elif isinstance(right, AS):
-                # left is host
-                if left in self.asndict.keys() and right.asn == self.asndict[left].asn:
-                    et = EdgeType.host
-                    lefttype = EdgeType.host
-                
-            # if we can find, replace, else just put it in again
-
-            if left == "localhost":
-                lefttype = EdgeType.start
-
-            if isinstance(left, AS):
-                ## replace AS with str
-                if (left.cc != ""):
-                    country = pycountry.countries.get(alpha_2=left.cc)
-                    cc = left.cc
-                    if country is not None:
-                        cc = country.name
-
-                    reverselist.append(EdgeTuple(cc, left.GetPrettyName(), EdgeType.cc, EdgeType.asn, edgeType=EdgeType.cc, data=left.asn))
-
-                left = left.GetPrettyName()
-                lefttype = EdgeType.asn
-            elif left in self.ipname and useHostnames:
-                ## convert ip to hostname
-                left = self.ipname[left]
-
-            if isinstance(right, AS):
-                ## replace AS with str
-                if (right.cc != ""):
-                    country = pycountry.countries.get(alpha_2=right.cc)
-                    cc = right.cc
-                    if country is not None:
-                        cc = country.name
-
-                    reverselist.append(EdgeTuple(cc, right.GetPrettyName(), EdgeType.cc, EdgeType.asn, edgeType=EdgeType.cc, data=right.asn))
-
-                right = right.GetPrettyName()
-                righttype = EdgeType.asn
-            elif right in self.ipname and useHostnames:
-                ## convert ip to hostname
-                right = self.ipname[right]
-
-            reverselist.append(EdgeTuple(left,right, lefttype, righttype, edgeType=et))
-
-        ## replace the list with our reverse list
-        listTuples = list(set(reverselist))
-        #listTuples = reverselist
-
-        # return what we have
-        return listTuples
+            return edges
 
     def GetHosts(self):
         return self.result.hosts

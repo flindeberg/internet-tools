@@ -8,7 +8,6 @@ import urllib.request
 from urllib.parse import urlparse
 import json
 
-
 import edgeutils
 
 @dataclass
@@ -38,6 +37,8 @@ class AS:
       country = pycountry.countries.get(alpha_2=s[-2:])
       if country is not None:
         country = country.name
+        # lets remote the last four, i.e. ", XX"
+        s = s[:-4]
     else: 
       country = ""
 
@@ -47,7 +48,10 @@ class AS:
   def GetPrettyName(self) -> str:
     ## Gets a pretty representation of the AS
     ## for now "AS full name (ASN)", i.g. "Google LLC (1234)"
-    return "{:} ({:})".format(self.name, self.asn)
+    if self.cc == "" or self.cc == None:
+      return '{:}\n({:})'.format(self.name, self.asn)
+    ## return the country code as well if we have it
+    return '{:}\n({:}, {:})'.format(self.name, self.asn, self.cc)
 
   def __str__(self):
     return self.GetPrettyName()
@@ -83,13 +87,13 @@ class ASFind:
   def ASNs(self):
     return self._ASNs
   
-  def contains(self, ip : ipaddress._BaseAddress) -> int:
+  def contains(self, ip : ipaddress._BaseAddress) -> List[int]:
     # check if we have a CIDR containing the ip
     # if we do, return the first asn
     for cidr in self.CIDRs:
       if ip in cidr:
         ## just assume the first is the best..
-        return self.ASNs[0]
+        return self.ASNs
     
     ## no match, lets return None
     return None
@@ -154,22 +158,20 @@ class ASNLookup:
             
             ## check for the hit again and use it
             if res:
-              name = ASNLookup.__p.get_as_name(res) ## lets find the AS name (hopefully)
-              asn = AS.CreateFromPyasnStr(ip, res, name) # really an as and not asn, but "as" is protected in Python
+              ## set the IP to point to first AS
+              ## Which is already populated
+              asinfo.ipas[ip] = asinfo.asas[res[0]]
 
-              # lets create both dictionaries for now
-              asinfo.ipas[ip] = asn # ip -> as
-              asinfo.asas[res] = asn # break
-              ## we are done with this ip
             else:
               ## Lets create it
-              print("IP-address {:} is not announced, looking for it with RDAP towards ARIN".format(ip.exploded))
+              print("IP-address {:} is not announced, looking for it with RDAP towards ARIN.".format(ip.exploded))
               url = ASNLookup.__urlrdap.format(ip)
               with urllib.request.urlopen(url) as rdap:
                 data = json.loads(rdap.read().decode())
                 ## handle json
                 start = ipaddress.ip_address(data["startAddress"]) #ip
                 end = ipaddress.ip_address(data["endAddress"]) #ip
+
                 if "arin_originas0_originautnums" in data:
                   asns = data["arin_originas0_originautnums"] # list
                   
@@ -178,21 +180,32 @@ class ASNLookup:
                   ASNLookup.__unannounced.append(asf)
                   
                   ## update our internal mappings
-                  asn = AS.CreateFromPyasnStr(ip, asns[0], ASNLookup.__p.get_as_name(asns[0]))
-                  asinfo.ipas[ip] = asn
-                  asinfo.asas[asns[0]] = asn
-                  print("Added {:} ({:}) which covers {:} to {:}".format(asn.name, asn.asn, start.exploded, end.exploded))
+                  for a in asns:
+                    asn = AS.CreateFromPyasnStr(ip, a, ASNLookup.__p.get_as_name(asns[0]))
+                    asinfo.ipas[ip] = asn
+                    asinfo.asas[a] = asn
+                    print("Added {:} ({:}) which covers {:} to {:}".format(asn.name, asn.asn, start.exploded, end.exploded))
                   
                 else:
                   # we do not have an ASN!
-                  asns = None
-                  
+                  # lets create a negative number representing it
+                  asns = [min(min([i for i in asinfo.asas if isinstance(i, int)]) - 1, -1)]
+
                   ## create and add to unannounced even if we do not have it
                   asf = ASFind(asns, start, end)
                   ASNLookup.__unannounced.append(asf)
                   
+                  # lets also use name and country from whois
+                  name = data["name"]
+                  cc = data["country"]
+                  
+                  # Create a temporary name from CIDRS
+                  cidrs = [cidr.exploded for cidr in ipaddress.summarize_address_range(start, end)]
+                  tmpname = ", ".join(cidrs)
+
                   ## update our internal mappings
-                  asn = AS.CreateFromPyasnStr(ip, -1, "Unnanouced")
+                  asn = AS(name, asns[0], cc, ip)
+                  #asn = AS.CreateFromPyasnStr(ip, asns[0], "{:}, {:}".format(name, cc))
                   asinfo.ipas[ip] = asn
                   asinfo.asas[asns[0]] = asn
                   print("Added {:} ({:}) which covers {:} to {:}".format(asn.name, asn.asn, start.exploded, end.exploded))

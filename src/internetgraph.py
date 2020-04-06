@@ -12,6 +12,7 @@ import matplotlib.cm as cm
 import networkx as nx
 import numpy as np
 
+import asnutils
 import harutilities
 from harutilities import EdgeType
 
@@ -59,7 +60,7 @@ def get_color(nr: int, all: int):
     res = np.array(cm.autumn(fact))[None, :]
     return res
 
-def draw_graph(graph: harutilities.EdgeList, file: str, graph_layout='spring'):
+def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='spring'):
 
     # just dump it
     #print(graph)
