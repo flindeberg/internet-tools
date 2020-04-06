@@ -50,6 +50,9 @@ class AS:
 
   def __str__(self):
     return self.GetPrettyName()
+  
+  def __repr__(self):
+    return self.__str__()
 
 ## Type aliases
 AsList = List[AS]

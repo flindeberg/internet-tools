@@ -163,6 +163,77 @@ class HarHost:
                 
                 refas = asinfo.ipas[ip]
                 self._astrace[key].append(refas)
+                
+    def getedges(self):
+        """
+            Get a list of edges from the current host object. 
+            Edges are entities made for graphing, and as such contain much less data than the HarHost object
+        """
+            # current = "localhost"
+            
+            # for point in currentList[key]:
+            #     if point == None:
+            #         # If we don't have a nice value just continue
+            #         continue
+   
+            #     listTuples.append((current, point))
+
+            #     current = point
+            
+            # #if current != harRes.hostTraceMap[key][-1]:
+            #     # i.e we are doing asn trace
+            #     # then we apply the last host manually
+            #     #listTuples.append((current,harRes.hostTraceMap[key][-1]))
+
+            # if current != key:
+            #     # the last host didn't respond to ping
+            #     # so we add it manually
+            #     listTuples.append((current,key))
+            
+            #   if (left.cc != ""):
+            #         country = pycountry.countries.get(alpha_2=left.cc)
+            #         cc = left.cc
+            #         if country is not None:
+            #             cc = country.name
+
+            #         reverselist.append(EdgeTuple(cc, left.GetPrettyName(), EdgeType.cc, EdgeType.asn, edgeType=EdgeType.cc, data=left.asn))
+
+            
+        # Start with "localhost"
+        
+        edges = list()
+        
+        lastNode = ("localhost", EdgeType.start)
+        
+        for ipkey in self._astrace:
+            # ipkey is ip
+            # annotate for type help
+            current: AS
+            for current in self._astrace[ipkey]:
+                # current is here an AS    
+                country = pycountry.countries.get(alpha_2=current.cc)
+
+                # use lastNode, as well as the current one
+                # current is ASN, lastNode might be "localhost" or ASN
+                # doublecheck that we are not referencing ourselves
+                if lastNode[0] != current.GetPrettyName():
+                    edges.append(EdgeTuple(lastNode[0], current.GetPrettyName(), 
+                                           lastNode[1], EdgeType.asn, lastNode[1], data=self.size))
+                
+                if country is not None: # only add countries which exist
+                    # add country connection as well
+                    edges.append(EdgeTuple(country.name, current.GetPrettyName(), 
+                                           EdgeType.cc, EdgeType.asn, EdgeType.cc, data=current.asn))
+
+                # prepare for next round
+                lastNode = (current.GetPrettyName(), EdgeType.asn)
+            
+            # We have added all but lastNode -> final host (IP)
+            edges.append(EdgeTuple(lastNode[0], self._host, 
+                                lastNode[1], EdgeType.host, EdgeType.host))
+        
+        # Now we have done all combinations
+        return edges
 
 HostDict = Dict[ipaddress._BaseAddress, HarHost]
 
@@ -415,84 +486,84 @@ class CheckHAR:
            
 
             # get asns from ips
-            allIps = functools.reduce(list.__add__, tracedIps)
-            ## now we get all ips, store all as and the ipas dict separately
-            r = self.GetAsList(list(set(allIps)))
-            self.result.asnsAll = r.asas.values()
-            self.asndict = r.ipas
+            # allIps = functools.reduce(list.__add__, tracedIps)
+            # ## now we get all ips, store all as and the ipas dict separately
+            # r = self.GetAsList(list(set(allIps)))
+            # self.result.asnsAll = r.asas.values()
+            # self.asndict = r.ipas
 
-            # add a fake localhost in local network
-            self.asndict["localhost"] = AS("local network", "NA", "", "10.0.0.1")
+            # # add a fake localhost in local network
+            # self.asndict["localhost"] = AS("local network", "NA", "", "10.0.0.1")
 
-            # get hosts and ips
-            # Gettings asns
-            for tip in self.result.hostTraceMap.keys():
-                filtered = list(filter(lambda x: x != "*",self.result.hostTraceMap[tip]))
+            # # get hosts and ips
+            # # Gettings asns
+            # for tip in self.result.hostTraceMap.keys():
+            #     filtered = list(filter(lambda x: x != "*",self.result.hostTraceMap[tip]))
 
-                ## hostmap has hosts only
-                ## asnmap has localhost, asns in the middle and hosts at the edges
-                self.result.hostTraceMap[tip] = filtered
-                self.result.asnTraceMap[tip] = list()
-                for item in self.result.hostTraceMap[tip]:
-                    tmpas = self.asndict[item]
-                    if tmpas.name is None:
-                        self.asndict[item].name = "N/A" 
-                        self.asndict[item].asn = item
+            #     ## hostmap has hosts only
+            #     ## asnmap has localhost, asns in the middle and hosts at the edges
+            #     self.result.hostTraceMap[tip] = filtered
+            #     self.result.asnTraceMap[tip] = list()
+            #     for item in self.result.hostTraceMap[tip]:
+            #         tmpas = self.asndict[item]
+            #         if tmpas.name is None:
+            #             self.asndict[item].name = "N/A" 
+            #             self.asndict[item].asn = item
 
-                    #if self.asndict[item].name == "N/A":
-                    #    print("{:} is not announced by an AS".format(item))
+            #         #if self.asndict[item].name == "N/A":
+            #         #    print("{:} is not announced by an AS".format(item))
 
-                    self.result.asnTraceMap[tip].append(self.asndict[item])
-                    ## TODO debug info
-                    if item == "localhost":
-                        print("localhost found {:}".format(self.result.hostTraceMap[tip]))
+            #         self.result.asnTraceMap[tip].append(self.asndict[item])
+            #         ## TODO debug info
+            #         if item == "localhost":
+            #             print("localhost found {:}".format(self.result.hostTraceMap[tip]))
 
-                ## Merge unknown AS into one for better overview
-                last = None
-                tracaslist = list()
-                for item in self.result.asnTraceMap[tip]:
-                    if last == None:
-                        last = item
-                        continue
+            #     ## Merge unknown AS into one for better overview
+            #     last = None
+            #     tracaslist = list()
+            #     for item in self.result.asnTraceMap[tip]:
+            #         if last == None:
+            #             last = item
+            #             continue
 
-                    # Check for match, if both N/A we have two unknown in a row, lets merge
-                    if last.name == "N/A" and item.name == "N/A":
-                        # create a new object, so we don't modify other references
-                        newasn = AS(item.name, 1, item.cc, None)
-                        newasn.asn = "{:}, {:}".format(last.asn, item.asn)
-                        newasn.asn = newasn.asn[:30] + (newasn.asn[30:] and '..')
-                        last = newasn
-                        # now we "drop" item by not carrying it over in last
-                    else:
-                        # We append and continue.
-                        tracaslist.append(last)
-                        last = item
+            #         # Check for match, if both N/A we have two unknown in a row, lets merge
+            #         if last.name == "N/A" and item.name == "N/A":
+            #             # create a new object, so we don't modify other references
+            #             newasn = AS(item.name, 1, item.cc, None)
+            #             newasn.asn = "{:}, {:}".format(last.asn, item.asn)
+            #             newasn.asn = newasn.asn[:30] + (newasn.asn[30:] and '..')
+            #             last = newasn
+            #             # now we "drop" item by not carrying it over in last
+            #         else:
+            #             # We append and continue.
+            #             tracaslist.append(last)
+            #             last = item
 
-                ## add last
-                tracaslist.append(last)
+            #     ## add last
+            #     tracaslist.append(last)
 
-                #Update list    
-                # print("Updating trace map, new:")
-                # for ele in tracaslist:
-                #     print(ele, sep=" -- ", end=" -- ")
+            #     #Update list    
+            #     # print("Updating trace map, new:")
+            #     # for ele in tracaslist:
+            #     #     print(ele, sep=" -- ", end=" -- ")
 
-                # print("")
-                # print("--- end new --- start Old ---")
-                # for ele in self.result.asnTraceMap[tip]:
-                #     print(ele, sep=" -- ", end=" -- ")
+            #     # print("")
+            #     # print("--- end new --- start Old ---")
+            #     # for ele in self.result.asnTraceMap[tip]:
+            #     #     print(ele, sep=" -- ", end=" -- ")
 
-                # print("")
-                # print("--- end old ---")
+            #     # print("")
+            #     # print("--- end old ---")
 
-                self.result.asnTraceMap[tip] = tracaslist
+            #     self.result.asnTraceMap[tip] = tracaslist
 
-            # filter it so we only have unique values
-            # asns where we fetched resources
-            self.result.asns = self.result.asns
-            # asns included those we were routed through
-            self.result.asnsAll = self.result.asnsAll
+            # # filter it so we only have unique values
+            # # asns where we fetched resources
+            # self.result.asns = self.result.asns
+            # # asns included those we were routed through
+            # self.result.asnsAll = self.result.asnsAll
 
-            #print ("ASNS: {:} TOTAL ASNS {:}".format(len(self.result.asns), len(self.result.asnsAll)))
+            # #print ("ASNS: {:} TOTAL ASNS {:}".format(len(self.result.asns), len(self.result.asnsAll)))
 
     def getEdges(self, dohosts: bool = False, useHostnames: bool = False) -> EdgeList:
         """
@@ -503,7 +574,9 @@ class CheckHAR:
         ## we should only get one, keeping as sanity check
         i = 1
 
+        
         # make sure we get the right list to start with
+        # TODO Remove?
         if dohosts:
             currentList = self.result.hostTraceMap
         else:
@@ -511,6 +584,9 @@ class CheckHAR:
 
         # the list of tuples we are going to return
         listTuples = list()
+
+        for key in self.result.hosts:
+            edges = self.result.hosts[key].getedges()
 
         ## current list is a dict<ip,list<trace>>
         for key in currentList.keys():
@@ -650,14 +726,14 @@ class CheckHAR:
         return self.result
 
 if __name__ == "__main__":
-    print ("Running utilities as main, not really useful")
+    print ("Running utilities as main, using fixed trace list")
     
     ## example trace, one local, one well known, and DNs
-    trace = ("2.18.74.134", ["192.168.0.1", "8.8.8.8", "2.18.74.134"])
+    #trace = ("2.18.74.134", ["192.168.0.1", "8.8.8.8", "2.18.74.134"])
     
-    hosts = ["www.dn.se", "www.svd.se", "www.happygreen.com"]
+    #hosts = ["www.dn.se", "www.svd.se", "www.happygreen.com"]
     
-    hh = HarHost("www.dn.se")
+    hh = HarHost("www.liu.se")
     print("Starting to resolve")
     hh.resolve()
     
@@ -666,5 +742,15 @@ if __name__ == "__main__":
     
     print("Starting to populate asns")
     hh.populateAsns()
+    
+    import pprint
+    
+    pprint.pprint(hh)
+    
+    print("Getting edges")
+    
+    pprint.pprint(hh.getedges())
+    pprint.pprint(hh._ipstrace)
+    pprint.pprint(hh._astrace)
     
     
