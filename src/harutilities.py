@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # to allow for proper annotations and class structures
 from __future__ import annotations
 # Copyright (c) 2019, 2020 Fredrik Lindeberg <flindeberg@gmail.com>
@@ -733,7 +734,7 @@ if __name__ == "__main__":
     
     #hosts = ["www.dn.se", "www.svd.se", "www.happygreen.com"]
     
-    hh = HarHost("www.liu.se")
+    hh = HarHost("www.happygreen.com")
     print("Starting to resolve")
     hh.resolve()
     

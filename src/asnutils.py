@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import ipaddress
 from typing import Dict, List, NamedTuple
 from dataclasses import dataclass
