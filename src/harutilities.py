@@ -165,10 +165,11 @@ class HarHost:
 
             for ip in self._ipstrace[key]:
                 # fetch the matching AS, it might be "bad", i.e. missing name if it doesn't exist
-                
-                refas = asinfo.ipas[ip]
-                self._astrace[key].append(refas)
-                
+                if ip in asinfo.ipas:
+                    # if we cant match ip, just skip it
+                    refas = asinfo.ipas[ip]
+                    self._astrace[key].append(refas)
+            
     def getedges(self) -> asnutils.EdgeList:
         """
             Get a list of edges from the current host object. 
@@ -499,6 +500,10 @@ class CheckHAR:
             print("Constructing edges from routing information")
             # force a set so we dont get duplicates
             edges = set([edge for key in self.result.hosts for edge in self.result.hosts[key].getedges()])
+
+            import pprint
+
+            pprint.pprint(edges)
 
             return edges
 

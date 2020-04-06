@@ -36,7 +36,7 @@ class AS:
     if s is not None:
       country = pycountry.countries.get(alpha_2=s[-2:])
       if country is not None:
-        country = country.name
+        country = s[-2:]
         # lets remote the last four, i.e. ", XX"
         s = s[:-4]
     else: 
@@ -189,7 +189,10 @@ class ASNLookup:
                 else:
                   # we do not have an ASN!
                   # lets create a negative number representing it
-                  asns = [min(min([i for i in asinfo.asas if isinstance(i, int)]) - 1, -1)]
+                  if len(asinfo.asas) > 0:
+                    asns = [min(min([i for i in asinfo.asas if isinstance(i, int)]) - 1, -1)]
+                  else:
+                    asns = [-1]
 
                   ## create and add to unannounced even if we do not have it
                   asf = ASFind(asns, start, end)
@@ -216,16 +219,24 @@ class ASNLookup:
           
           else:
             ## pyasn got a good match, lets use pyasn fully
-            ## __p is the global pyasn instance, contents are cached and loaded to memory
-            name = ASNLookup.__p.get_as_name(r[0])
-            asn = AS.CreateFromPyasnStr(ip, r[0], name) # really an as and not asn, but "as" is protected in Python
+            ## first, lets check if we have it already
+            if r[0] in asinfo.asas:
+              # we have it, add ip and we are done
+              asinfo.ipas[ip] = asinfo.asas[r[0]] # ip -> as
+            else:
+              # We do not already have it, we need to create one
+              ## __p is the global pyasn instance, contents are cached and loaded to memory
+              name = ASNLookup.__p.get_as_name(r[0])
+              asn = AS.CreateFromPyasnStr(ip, r[0], name) # really an as and not asn, but "as" is protected in Python
 
-            # lets create both dictionaries for now
-            asinfo.ipas[ip] = asn # ip -> as
-            asinfo.asas[r[0]] = asn # 
+              # lets create both dictionaries for now
+              asinfo.ipas[ip] = asn # ip -> as
+              asinfo.asas[r[0]] = asn # 
                 
         elif ip.is_private:
           ## local ip-address
+          print("IP-address '{:}' is a private network.".format(ip))
+
           name = "Private network"
           if name not in asinfo.asas:
             asn = AS.CreateFromPyasnStr(ip, 0, name) # really an as and not asn, but "as" is protected in Python
