@@ -36,7 +36,7 @@ if ! (pgrep -x ".*Chrom.*" > /dev/null) ; then
 
     ## --no-sandbox required for linux and root
     ##${browser} --remote-debugging-port=9222 --headless --content --disk-cache-dir=/dev/null --disable-gpu --download-whole-document --deterministic-fetch --net-log-capture-mode IncludeCookiesAndCredentials &> /dev/null &
-    ${browser} --remote-debugging-port=9222 --no-sandbox --headless --content --disable-gpu --download-whole-document --deterministic-fetch --net-log-capture-mode IncludeCookiesAndCredentials &> /dev/null &
+    "${browser}" --remote-debugging-port=9222 --no-sandbox --headless --content --disable-gpu --download-whole-document --deterministic-fetch --net-log-capture-mode IncludeCookiesAndCredentials & 1> /dev/null &
 
     ## sometimes we have had issues here, sleeping lets Chrome properly boot up
     sleep 2
