@@ -138,7 +138,11 @@ class HarHost:
             TODO Add support for IPv6, currently failing due to unknown reasons
         """
         ## TODO Tracemanager does not handle IP class!
+        print("Tracing:")
+        pprint.pprint(self.ips)
         traces = TraceManager.TraceAll(self.ips)
+        print("Got traces")
+        pprint.pprint(traces)
         for key in traces:
             ## Save the filtered list (i.e. we do not care about missing steps)
             filtered = list(filter(lambda x: x != "*", traces[key]))
@@ -733,6 +737,7 @@ if __name__ == "__main__":
     #trace = ("2.18.74.134", ["192.168.0.1", "8.8.8.8", "2.18.74.134"])
     
     #hosts = ["www.dn.se", "www.svd.se", "www.happygreen.com"]
+    import pprint
     
     hh = HarHost("www.happygreen.com")
     print("Starting to resolve")
@@ -743,8 +748,6 @@ if __name__ == "__main__":
     
     print("Starting to populate asns")
     hh.populateAsns()
-    
-    import pprint
     
     pprint.pprint(hh)
     
