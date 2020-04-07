@@ -108,7 +108,15 @@ def main(arg=None):
                 
             if not args.quiet:
                 print("Opening the graph (might take a while for big graphs)")
-                os.system("open " + chartname)
+                import platform
+                if platform.system() == "Darwin":
+                    opencmd = "open {:}".format(chartname)
+                elif platform.system() == "Linux":
+                    opencmd = "xdg-open {:} &".format(chartname)
+                else:
+                    opencmd = "{:}".format(chartname)
+
+                os.system(opencmd)
 
 def CreateFolder(args):
     print ("Creating ouput folder")
