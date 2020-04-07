@@ -237,7 +237,9 @@ class ASNLookup:
           ## local ip-address
           print("IP-address '{:}' is a private network.".format(ip))
 
-          name = "Private network"
+          cidr = ipaddress.ip_network(ip).supernet(new_prefix=24)
+
+          name = "Private network {:}".format(cidr)
           if name not in asinfo.asas:
             asn = AS.CreateFromPyasnStr(ip, 0, name) # really an as and not asn, but "as" is protected in Python
             # lets create both dictionaries for now
