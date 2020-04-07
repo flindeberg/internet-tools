@@ -137,23 +137,34 @@ class HarHost:
             print("Unexpected error:", sys.exc_info()[0])
             print("Unexpected error:", sys.exc_info())
             ## put it in the list, that way we still keep it even though we could not resolve it
-            
+    
+    def getToTrace(self):
+        """ Helper func for future refactoring """
+        return self.ips
+
     def trace(self):
         """
             Does a trace route for all applicable IPS
             TODO Add support for IPv6, currently failing due to unknown reasons
         """
         ## TODO Tracemanager does not handle IP class!
-        #print("Tracing:")
-        #pprint.pprint(self.ips)
         traces = TraceManager.TraceAll(self.ips)
-        #print("Got traces")
-        #pprint.pprint(traces)
-        for key in traces:
+        
+        self.addTraces(traces)
+
+    def addTraces(self, traces: Dict[ipaddress._BaseAddress, list]):
+        """
+            Helper function for adding traces back to HarHost
+        """
+        # TODO take care of the case if it is missing in traces?
+        for key in self.ips:
+            if key not in traces:
+                raise ValueError("Could not find key '{:}' in traces!".format(key))
             ## Save the filtered list (i.e. we do not care about missing steps)
             filtered = list(filter(lambda x: x != "*", traces[key]))
             iplist = list(ipaddress.ip_address(x) for x in filtered)
             self._ipstrace[ipaddress.ip_address(key)] = iplist
+
 
     def populateAsns(self):
         """
@@ -181,38 +192,7 @@ class HarHost:
             Get a list of edges from the current host object. 
             Edges are entities made for graphing, and as such contain much less data than the HarHost object
         """
-            # current = "localhost"
-            
-            # for point in currentList[key]:
-            #     if point == None:
-            #         # If we don't have a nice value just continue
-            #         continue
-   
-            #     listTuples.append((current, point))
-
-            #     current = point
-            
-            # #if current != harRes.hostTraceMap[key][-1]:
-            #     # i.e we are doing asn trace
-            #     # then we apply the last host manually
-            #     #listTuples.append((current,harRes.hostTraceMap[key][-1]))
-
-            # if current != key:
-            #     # the last host didn't respond to ping
-            #     # so we add it manually
-            #     listTuples.append((current,key))
-            
-            #   if (left.cc != ""):
-            #         country = pycountry.countries.get(alpha_2=left.cc)
-            #         cc = left.cc
-            #         if country is not None:
-            #             cc = country.name
-
-            #         reverselist.append(EdgeTuple(cc, left.GetPrettyName(), EdgeType.cc, EdgeType.asn, edgeType=EdgeType.cc, data=left.asn))
-
-            
         # Start with "localhost"
-        
         edges = list()
         
         lastNode = ("localhost", EdgeType.start)
@@ -471,45 +451,47 @@ class CheckHAR:
                 self.result.cookies.extend(entry["request"]["cookies"])
                 self.result.cookies.extend(entry["response"]["cookies"])
 
-            # magic done with hosts
-            # get unique list, this is done via set
-            # should be unnessecary now
-            ## self.result.hosts = list(set(self.result.hosts))
-
             print("Parser loaded, {:} hosts in total".format(len(self.result.hosts)))
-            # for entry in self.result.hosts:
-            #    print(entry)    
 
-            #locallistips = list()
-
+    def cook(self):
+            """ Cooks the the Har so we can get the edges. Has to be called prior to getEdges """
             # go through all the hosts we use, and check paths and asns passed to get there
             print("Starting to resolve hosts")
             for key in self.result.hosts:
                 self.result.hosts[key].resolve()
 
-            # IPs we have found resources at 
-            #print("IP-addresses we have found resources at (duplicates removed):")
-            #edges = set([ip for key in self.result.hosts 
-            #                  for ip in self.result.hosts[key].ips])
-            #print(set(self.result.hosts[hh].ips for hh in self.result.hosts))
-
             # Make sure we trace all ips
-            print("Starting to trace hosts")
+            ipstotrace = list()
+            print("Collecting IPs to trace")
             for key in self.result.hosts:
-                self.result.hosts[key].trace()
+                #self.result.hosts[key].trace()
+                ipstotrace.extend(self.result.hosts[key].getToTrace())
+
+            ## Trace all at the same time (due to GIL issues with Python...)
+            print("Starting to trace hosts")
+            traces = TraceManager.TraceAll(set(ipstotrace))
+
+            print("Adding traces to hosts")
+            for key in self.result.hosts:
+                self.result.hosts[key].addTraces(traces)
 
             # Now we have all hosts, their traceroutes (hopefully somewhat populated), 
             # now it is time to resolve their autonomous systems
-            print("Starting to resolve autonomous systems")
+            print("Starting to resolve autonomous systems from traces")
             for key in self.result.hosts:
                 self.result.hosts[key].populateAsns()
 
     def getEdges(self, dohosts: bool = False, useHostnames: bool = False) -> asnutils.EdgeList:
-
+            """ 
+            Gets all edges in asnutils.EdgeList 
+            Has to be called after 'cook()'
+            """
 
             print("Constructing edges from routing information")
             # force a set so we dont get duplicates
-            edges = set([edge for key in self.result.hosts for edge in self.result.hosts[key].getedges()])
+            edges = set([edge 
+                        for key in self.result.hosts 
+                        for edge in self.result.hosts[key].getedges()])
 
             # import pprint
             # pprint.pprint(edges)

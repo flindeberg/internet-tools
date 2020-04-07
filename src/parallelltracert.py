@@ -54,7 +54,7 @@ from multiprocessing.pool import ThreadPool
 __all__ = ['MyTracer']
 __tracedebug__ = False
 
-__MAXPORT__ = 33655
+__MAXPORT__ = 33485
 __MINPORT__ = 33434
 
 def dprint(x):

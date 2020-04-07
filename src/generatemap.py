@@ -90,6 +90,9 @@ def main(arg=None):
             ## Lets analyze the har
             harchecker = harutilities.CheckHAR()
             harchecker.Load(fullharname)
+
+            ## Prepare the har, i.e. resolve hosts, trace hosts and resolve ASNs (where possible)
+            harchecker.cook()
                             
             ## Do something more, or just close files and be happy?
             edges = harchecker.getEdges(useHostnames=True)
