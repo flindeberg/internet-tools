@@ -81,7 +81,7 @@ def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='spring'):
         if edge.edgeType == EdgeType.cc:
             # lower weight for country codes
             weight = 2
-            length = 2
+            length = 4
         elif edge.edgeType == EdgeType.asn:
             weight = 1.5
         elif edge.edgeType == EdgeType.host:
@@ -195,7 +195,8 @@ def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='spring'):
     plt.axis('off')   
     
     #plt.show()
-    plt.savefig(file, format='png', dpi=1000, pad_inches=0.0)
+    #plt.savefig(file, format='png', dpi=1000, pad_inches=0.3)
+    plt.savefig(file, format='png', dpi=350, pad_inches=0.3)
     plt.gcf().clear()
 
 if __name__ == "__main__":

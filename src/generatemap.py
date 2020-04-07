@@ -182,6 +182,7 @@ if __name__ == "__main__":
         print("Tracing will require root, restarting with sudo")
         print("[If you do not trust this application, do not continue]")
         elevate(show_console=False, graphical=False)
+        print("Elevated, restarting application as root")
         
     ## call main 
     main()

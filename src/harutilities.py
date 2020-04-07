@@ -49,6 +49,12 @@ class HarHost:
         self._realsize = realsize
         self._ipstrace = dict() # str -> list[str]
         self._astrace = dict() # str -> list[AS]
+        self._asnlookup = asnutils.ASNLookup() ## Lets use one lookup util per instance of har host
+
+    def setASNLookup(self, lookup : asnutils.ASNLookup):
+        """ Force a specific ASNLookup for this HarHost (could be useful for speed) """
+        self._asnlookup = lookup
+
 
     @property 
     def ips(self):
@@ -404,6 +410,8 @@ class CheckHAR:
         None
         self.nameip = dict()
         self.ipname = dict()
+        # Lets have a lookup we can share for faster lookups
+        self._asnlookup = asnutils.ASNLookup()
     
     def GetAsList(self, l : List[str]) -> asnutils.AsInfo:
         #cymruClient = cymruwhois.Client()
@@ -449,6 +457,8 @@ class CheckHAR:
                 for h in parsedhost:
                     ## Create a host object matching the host
                     hh = HarHost(h,transfersize=transfersize, realsize=realsize)
+                    ## lets use our set lookup for speed
+                    hh.setASNLookup(self._asnlookup)
 
                     ## if we have the host, just update it
                     ## if we don't, add it
@@ -478,9 +488,9 @@ class CheckHAR:
                 self.result.hosts[key].resolve()
 
             # IPs we have found resources at 
-            print("IP-addresses we have found resources at (duplicates removed):")
-            edges = set([ip for key in self.result.hosts 
-                              for ip in self.result.hosts[key].ips])
+            #print("IP-addresses we have found resources at (duplicates removed):")
+            #edges = set([ip for key in self.result.hosts 
+            #                  for ip in self.result.hosts[key].ips])
             #print(set(self.result.hosts[hh].ips for hh in self.result.hosts))
 
             # Make sure we trace all ips
@@ -501,9 +511,8 @@ class CheckHAR:
             # force a set so we dont get duplicates
             edges = set([edge for key in self.result.hosts for edge in self.result.hosts[key].getedges()])
 
-            import pprint
-
-            pprint.pprint(edges)
+            # import pprint
+            # pprint.pprint(edges)
 
             return edges
 

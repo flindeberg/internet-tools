@@ -54,6 +54,9 @@ from multiprocessing.pool import ThreadPool
 __all__ = ['MyTracer']
 __tracedebug__ = False
 
+__MAXPORT__ = 33655
+__MINPORT__ = 33434
+
 def dprint(x):
     """
     Debug print for this module
@@ -76,7 +79,8 @@ class TraceManager(object):
     __singleton = None
 
     ## 200 is arbitrarily chosen, seemed to work well on modern connections (i.e. ballpark gbit). Scale down if needed. 
-    __pool = ThreadPool(200)
+    ## Lets use one per port we use instead
+    __pool = ThreadPool(__MAXPORT__ - __MINPORT__ + 1)
 
     @classmethod
     def Instance(cls):
@@ -242,7 +246,9 @@ class MyTracer(object):
         while True:
             with MyTracer.lock:
                 # Pick up a random port in the range 33434-33534
-                self.port = random.choice(range(33434, 33464))
+                #self.port = random.choice(range(33434, 33464))
+                self.port = random.choice(range(__MINPORT__, __MAXPORT__))
+                
                 if self.port not in MyTracer.ports:
                     MyTracer.ports.add(self.port)
                     return

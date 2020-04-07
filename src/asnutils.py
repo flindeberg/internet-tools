@@ -12,6 +12,11 @@ import edgeutils
 
 @dataclass
 class AS:
+  """
+    Class to represent prettyprintable autonomous systems
+
+    Contain an inner collection of more meaningful AS (in a technical sense)
+  """
   ### Class to represent-AS entities
   #self.name: str
   #self.asn: int
@@ -74,6 +79,9 @@ class AsInfo(NamedTuple):
 @dataclass
 class ASFind:
   def __init__(self, asns : List[int], start : ipaddress._BaseAddress, end : ipaddress._BaseAddress):
+    """
+      Initiate a new ASFind object, based on ASNs (ints), and an address range
+    """
     super().__init__()
     
     self._CIDRs = list(ipaddress.summarize_address_range(start, end))
@@ -81,6 +89,7 @@ class ASFind:
   
   @property
   def CIDRs(self):
+    """ Returns CIDRs represented by this object """
     return self._CIDRs
   
   @property
@@ -88,15 +97,26 @@ class ASFind:
     return self._ASNs
   
   def contains(self, ip : ipaddress._BaseAddress) -> List[int]:
+    """
+      Checks if the IP is contained in this ASFind object
+    """
     # check if we have a CIDR containing the ip
     # if we do, return the first asn
     for cidr in self.CIDRs:
       if ip in cidr:
-        ## just assume the first is the best..
+        ## lets just return all of the ASNs instead of cherry picking here
         return self.ASNs
     
     ## no match, lets return None
     return None
+
+  def addIPrange(self, start : ipaddress._BaseAddress, end : ipaddress._BaseAddress):
+    """ Adds a new IP range to the CIDR collection """
+    self._CIDRs.extend(ipaddress.summarize_address_range(start, end))
+
+  def addCIDRs(self, cidrs : List[ipaddress._BaseNetwork]):
+    """ Adds more CIDRs to the CIDR collection """
+    self._CIDRs.extend(cidrs)
 
 class ASNLookup:
   """ Class for looking up ASN data """
@@ -104,6 +124,9 @@ class ASNLookup:
   __p = pyasn.pyasn("pyasn.dat", "pyasn.json")
   
   ## Url from which to do a curl for rdap data
+  ## TODO Use rdap library, problematic currently since no rdap libs I've 
+  ## found have the "arin_originas0_originautnums" field (which is necessary)
+  ## "arin_originas0_originautnums" is returned by arin
   __urlrdap = "https://rdap.arin.net/registry/ip/{:}"
   
   ## list with unnannounced AS which we have figured out
@@ -112,11 +135,12 @@ class ASNLookup:
   def __init__(self):
     # load all names and pyas
     #self.p = pyasn.pyasn("pyasn.dat", "pyasn.json")
-    None
-    
+
+    # Our presumed object
+    self._asinfo = AsInfo()
 
   def lookupmanystr(self, ips: List[str]) -> AsInfo:
-    
+    """ Looks up AsInfo from a list of IP-addresses in string-type """
     ipstyped = list()
     for ip in set(ips): ## remove duplicates
       try:
@@ -130,12 +154,28 @@ class ASNLookup:
       
     
   def lookupmany(self, ips: List[ipaddress.IPv4Address]) -> AsInfo:
-    asinfo = AsInfo()
+    """ Looks up AsInfo from a list of IP-addresses ipaddress.IPv4Address-type """
+
+    # Our presumed object
+    # use instance variable for now
+    asinfo = self._asinfo
+    # asinfo = AsInfo()
     
     # go through ips and resolve  them
     for ip in ips:
       try:
         ## we know we have proper IPv4 address here
+
+        ## IDEA: 
+        # 1) check if we have resolved that IP, if we have use it
+        # 2) use pyasn (since pyasn is damn fast)
+        # 3) check the local list of unnanounced networks
+        # 4) some weird network, store but mark
+
+        if ip in asinfo.ipas:
+          # We already have it, lets just continue
+          # print("IP-address {:} already in database ({:}).".format(ip.exploded, asinfo.ipas[ip].name))
+          continue
 
         # Sanity checks so we know what to do
         # Only check global and private ips
@@ -143,9 +183,9 @@ class ASNLookup:
           # we have a an IP which is global, i.e. should
           # be routable
           # tuple, 0 = asn, 1 = prefix
-          r = ASNLookup.__p.lookup(ip.exploded)
+          pyasntuple = ASNLookup.__p.lookup(ip.exploded)
           
-          if r[0] == None and r[1] == None:
+          if pyasntuple[0] == None and pyasntuple[1] == None:
             ## We do not have this ASN / prefix
         
             # check if we have it in our cache
@@ -172,7 +212,8 @@ class ASNLookup:
                 start = ipaddress.ip_address(data["startAddress"]) #ip
                 end = ipaddress.ip_address(data["endAddress"]) #ip
 
-                if "arin_originas0_originautnums" in data:
+                # ensure that we have the field and that we actually have data in it
+                if "arin_originas0_originautnums" in data and len(data["arin_originas0_originautnums"]) > 0:
                   asns = data["arin_originas0_originautnums"] # list
                   
                   ## create and add to unannounced
@@ -188,6 +229,7 @@ class ASNLookup:
                   
                 else:
                   # we do not have an ASN!
+                  # but we have a country, so lets go with that
                   # lets create a negative number representing it
                   if len(asinfo.asas) > 0:
                     asns = [min(min([i for i in asinfo.asas if isinstance(i, int)]) - 1, -1)]
@@ -197,14 +239,38 @@ class ASNLookup:
                   ## create and add to unannounced even if we do not have it
                   asf = ASFind(asns, start, end)
                   ASNLookup.__unannounced.append(asf)
-                  
-                  # lets also use name and country from whois
-                  name = data["name"]
-                  cc = data["country"]
-                  
-                  # Create a temporary name from CIDRS
-                  cidrs = [cidr.exploded for cidr in ipaddress.summarize_address_range(start, end)]
-                  tmpname = ", ".join(cidrs)
+
+                  if "country" in data: 
+                    # lets also use name and country from whois
+                    name = data["name"]
+                    cc = data["country"]
+                  else:
+                    # assume bad country and we need to dig deeper for good name
+                    cc = "XX"
+                    name = data["name"]
+
+                  # we have neither ASN nor country. This is a secret ASN! :)
+                  # EX: https://rdap.arin.net/registry/ip/150.222.244.8
+
+                  # we need entities -> (element in array) -> vcardarray -> [1] -> [1] -> [3] => Amazon Technologies Inc.
+                  # lets overwrite with whatever we find in vcard
+                  for entity in data["entities"]:
+                    # go through all entities
+                    if "vcardArray" in entity:
+                      # we have a match, a vcardArray!
+                      # this is the magic position of the name in a vcardarray-record
+                      name = entity["vcardArray"][1][1][3]
+                      break
+
+                  if name == None:
+                    # We have no idea what is happening, failing for now
+                    # TODO decide if fail or not
+                    #raise ValueError("Could not find vcardArray in rdap-record! (undocumented case, we fail for now)")
+
+                    # Create a temporary name from CIDRS
+                    cidrs = [cidr.exploded for cidr in ipaddress.summarize_address_range(start, end)]
+                    name = ", ".join(cidrs)
+
 
                   ## update our internal mappings
                   asn = AS(name, asns[0], cc, ip)
@@ -212,36 +278,37 @@ class ASNLookup:
                   asinfo.ipas[ip] = asn
                   asinfo.asas[asns[0]] = asn
                   print("Added {:} ({:}) which covers {:} to {:}".format(asn.name, asn.asn, start.exploded, end.exploded))
-                
-          elif r[0] == None or r[1] == None:
+
+          elif pyasntuple[0] == None or pyasntuple[1] == None:
             ## We don't know this case, lets crash
             raise ValueError("Get either ASN or prefix, undefined case, failing fast and early (might be possible bug, undocumented case)")
           
           else:
             ## pyasn got a good match, lets use pyasn fully
             ## first, lets check if we have it already
-            if r[0] in asinfo.asas:
+            if pyasntuple[0] in asinfo.asas:
               # we have it, add ip and we are done
-              asinfo.ipas[ip] = asinfo.asas[r[0]] # ip -> as
+              asinfo.ipas[ip] = asinfo.asas[pyasntuple[0]] # ip -> as
             else:
               # We do not already have it, we need to create one
               ## __p is the global pyasn instance, contents are cached and loaded to memory
-              name = ASNLookup.__p.get_as_name(r[0])
-              asn = AS.CreateFromPyasnStr(ip, r[0], name) # really an as and not asn, but "as" is protected in Python
+              name = ASNLookup.__p.get_as_name(pyasntuple[0])
+              asn = AS.CreateFromPyasnStr(ip, pyasntuple[0], name) # really an as and not asn, but "as" is protected in Python
 
               # lets create both dictionaries for now
               asinfo.ipas[ip] = asn # ip -> as
-              asinfo.asas[r[0]] = asn # 
+              asinfo.asas[pyasntuple[0]] = asn # 
                 
         elif ip.is_private:
           ## local ip-address
-          print("IP-address '{:}' is a private network.".format(ip))
-
           cidr = ipaddress.ip_network(ip).supernet(new_prefix=24)
 
-          name = "Private network {:}".format(cidr)
+          print("IP-address {:} is not public, adding as part of {:}.".format(ip, cidr))
+
+          name = "Private {:}".format(cidr)
           if name not in asinfo.asas:
             asn = AS.CreateFromPyasnStr(ip, 0, name) # really an as and not asn, but "as" is protected in Python
+            asn.cc = "XX"
             # lets create both dictionaries for now
             asinfo.ipas[ip] = asn # ip -> as
             asinfo.asas[name] = asn # 
@@ -250,6 +317,7 @@ class ASNLookup:
             asinfo.ipas[ip] = asinfo.asas[name] # ip -> as
             
         else:
+          ## TODO Should we do something here?
           print("IP-address '{:}' is neither global nor local, skipping for now.".format(ip))
 
         
@@ -264,10 +332,15 @@ class ASNLookup:
 if __name__ == "__main__":
   print ("Running utilities as main, not really useful")
   
+  import pprint
+
   ## example trace, one local, one well known, one in amazons network which is not announced, and DNs
   trace = ("2.18.74.134", ["192.168.0.1", "8.8.8.8", "52.93.2.80", "52.93.2.81", "2.18.74.134"])      
   
+  pprint.pprint(trace)
+
   asl = ASNLookup()
   res = asl.lookupmanystr(trace[1])
   
-  print(res)
+  
+  pprint.pprint(res)
