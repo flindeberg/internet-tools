@@ -60,13 +60,14 @@ def get_color(nr: int, all: int):
     res = np.array(cm.autumn(fact))[None, :]
     return res
 
-def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='spring'):
+def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='sfdp'):
 
     # just dump it
     #print(graph)
 
     # create networkx graph
-    G=nx.Graph()
+    #G=nx.Graph()
+    G=nx.MultiDiGraph()
 
     # save the nodes for later
     nodes = list()
@@ -77,15 +78,17 @@ def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='spring'):
     for edge in graph:
         ## assume ihost (i.e. indirect host, trace failed)
         weight = 4
-        length = 4
+        length = 2
         if edge.edgeType == EdgeType.cc:
             # lower weight for country codes
             weight = 2
             length = 4
         elif edge.edgeType == EdgeType.asn:
             weight = 1.5
+            length = 4
         elif edge.edgeType == EdgeType.host:
             weight = 8
+            length = 2
 
         # add nodes and edges to graph model
         G.add_edge(edge.node1, edge.node2, weight=weight, length=length)
@@ -148,8 +151,11 @@ def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='spring'):
     #wrappers["ASNedges"] = DrawWrapper(None, edges[EdgeType.asn], "ASN", "o", textsize=4, nodesize=300, color="red")
 
     # these are different layouts for the network you may try
-    # shell seems to work best
-    if graph_layout == 'spring':
+    # for now defaulting to graphviz
+    if graph_layout == 'sfdp':
+        ## Default to using graphviz, better and faster..
+        graph_pos=nx.drawing.nx_agraph.graphviz_layout(G, prog='fdp', root="localhost")
+    elif graph_layout == 'spring':
         #graph_pos=nx.spring_layout(G, pos={startNode[0]: (0.5,0.5)}, fixed=startNode, iterations=150, scale=1)
         graph_pos=nx.spring_layout(G, iterations=150, scale=1)
     elif graph_layout == 'spectral':
