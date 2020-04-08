@@ -249,18 +249,31 @@ class ASNLookup:
                     cc = "XX"
                     name = data["name"]
 
-                  # we have neither ASN nor country. This is a secret ASN! :)
                   # EX: https://rdap.arin.net/registry/ip/150.222.244.8
-
                   # we need entities -> (element in array) -> vcardarray -> [1] -> [1] -> [3] => Amazon Technologies Inc.
                   # lets overwrite with whatever we find in vcard
                   for entity in data["entities"]:
                     # go through all entities
-                    if "vcardArray" in entity:
+                    # which match certain criteria
+                    if ("vcardArray" in entity and
+                        "roles" in entity and
+                        "abuse" not in entity["roles"]):
                       # we have a match, a vcardArray!
                       # this is the magic position of the name in a vcardarray-record
-                      name = entity["vcardArray"][1][1][3]
+                      potential_name = entity["vcardArray"][1][1][3]
+                      if not ("Role" in potential_name or 
+                            "Abuse" in potential_name or
+                            "abuse" in potential_name or
+                            "role" in potential_name):
+                        # We need to watch out here, might be unusable name
+                        name = potential_name
                       break
+
+                  # if we have description that is even better, overwrite again
+                  if "remarks" in data:
+                    if len(data["remarks"]) > 0:
+                      if "description" in data["remarks"][0]:
+                        name = data["remarks"][0]["description"][0]
 
                   if name == None:
                     # We have no idea what is happening, failing for now
