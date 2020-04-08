@@ -198,6 +198,7 @@ def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='spring'):
     #plt.savefig(file, format='png', dpi=1000, pad_inches=0.3)
     plt.savefig(file, format='png', dpi=350, pad_inches=0.3)
     plt.gcf().clear()
+    print("Graph-png saved to {:}".format(file))
 
 if __name__ == "__main__":
     print("Did you really intend to run this as main?")
