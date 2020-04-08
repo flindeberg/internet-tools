@@ -1,6 +1,6 @@
 #!/bin/python3
 
-# Copyright (c) 2019 Fredrik Lindeberg <flindeberg@gmail.com>
+# Copyright (c) 2019, 2020 Fredrik Lindeberg <flindeberg@gmail.com>
 # All rights reserved.
 
 import argparse
@@ -27,19 +27,25 @@ from harutilities import urlutils
 def main(arg=None):
 
     ## no args, lets fetch from commandline
-    parser = argparse.ArgumentParser(description="Draw tracemaps based on a set of hosts")
+    parser = argparse.ArgumentParser(
+            description="Draw tracemaps based on a set of hosts")
 
-    parser.add_argument('-s', '--separate', action='store_true', help="run separate instances per website (i.e. not all in one graph)")
-    parser.add_argument('-q', '--quiet', action='store_true', help="does not try to open graph in default program after run")
-    parser.add_argument('-c', '--clean', action='store_true', help="runs cleanly (i.e. does not check asn owners etc), but still needs DNS")
+    parser.add_argument('-s', '--separate', action='store_true', 
+        help="run separate instances per website (i.e. not all in one graph)")
+    parser.add_argument('-q', '--quiet', action='store_true', 
+        help="does not try to open graph in default program after run")
+    parser.add_argument('-c', '--clean', action='store_true', 
+        help="runs cleanly (i.e. does not check asn owners etc), but still needs DNS")
     parser.add_argument('-n', '--iterations', type=int, default=1)
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-f', '--file', help="path to file with hosts")
-    group.add_argument('-w', '--hostnames', nargs='+', help="list of hosts to query")
+    group.add_argument('-w', '--hostnames', nargs='+', 
+        help="list of hosts to query")
     group.add_argument('-e', '--har', help="har-file to use directly")
 
-    parser.add_argument('-o', '--output', help="output directory (everything goes here)")
+    parser.add_argument('-o', '--output', 
+                        help="output directory (everything goes here)")
 
     if arg is not None:
         args = parser.parse_args(arg)
@@ -91,7 +97,8 @@ def main(arg=None):
             harchecker = harutilities.CheckHAR()
             harchecker.Load(fullharname)
 
-            ## Prepare the har, i.e. resolve hosts, trace hosts and resolve ASNs (where possible)
+            ## Prepare the har, i.e. resolve hosts, trace hosts and resolve 
+            ## ASNs (where possible)
             harchecker.cook()
                             
             ## Do something more, or just close files and be happy?
@@ -104,7 +111,8 @@ def main(arg=None):
             
             if args.output is not None:
                     print ("Copying graph-file to output")
-                    tochart = os.path.join(args.output, Path(fullharname).stem + ".png")
+                    tochart = os.path.join(args.output, 
+                                            Path(fullharname).stem + ".png")
                     copyfile(chartname, tochart)
                     # use (i.e. open) copied file instead 
                     chartname = tochart
@@ -166,7 +174,8 @@ def CreateHarFile(tmpfile, tmpdir : str):
     if len(files) == 0:
         sys.exit("No har-file found. Did Chrome crash?")
     elif len(files) > 1:
-        sys.exit("Multiple har-files found, something went wrong ({:})".format(files))
+        sys.exit("Multiple har-files found, something went wrong ({:})"
+                        .format(files))
 
     # we should only have one
     harfilename = files[0]
@@ -190,6 +199,7 @@ if __name__ == "__main__":
     ## call main 
     main()
 else:
-    # We are supposed to run as a script, for now just exit to avoid weird behaviour. 
+    # We are supposed to run as a script, for now just exit to avoid weird
+    # behaviour. 
     # change if needed
     sys.exit(2)
