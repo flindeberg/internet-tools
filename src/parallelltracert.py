@@ -54,7 +54,9 @@ from multiprocessing.pool import ThreadPool
 __all__ = ['MyTracer']
 __tracedebug__ = False
 
-__MAXPORT__ = 33485
+## HACK empirically the cutoff seems to be around 33634
+## standardswise this should not be an issue
+__MAXPORT__ = 33634
 __MINPORT__ = 33434
 
 def dprint(x):
@@ -78,8 +80,7 @@ class TraceManager(object):
 
     __singleton = None
 
-    ## 200 is arbitrarily chosen, seemed to work well on modern connections (i.e. ballpark gbit). Scale down if needed. 
-    ## Lets use one per port we use instead
+    ## Lets use one per port, works good enough
     __pool = ThreadPool(__MAXPORT__ - __MINPORT__ + 1)
 
     @classmethod
@@ -173,7 +174,8 @@ class TraceManager(object):
             local_ip, 
             len(self.__traced.keys()), 
             (len(self.__tracing) + len(self.__traced.keys())),
-            round(100 * (len(self.__traced.keys())) / (len(self.__tracing) + len(self.__traced.keys())),2),
+            round(100 * (len(self.__traced.keys())) / 
+                        (len(self.__tracing) + len(self.__traced.keys())),2),
             len(self.__tracing)
         ))
 
@@ -233,8 +235,9 @@ class MyTracer(object):
         # Loop for starting the listener
         with MyTracer.lock:
             if not MyTracer.listening:
-                # important to use a THREADpool, and not a pool which is processes
-                # we don't want processes, period. Processes in Python are weird. 
+                # important to use a THREADpool, and not a pool which is 
+                # processes we don't want processes, period. Processes in 
+                # Python are weird. 
                 pool = ThreadPool(1)
                 # start it
                 pool.apply_async(MyTracer.listen)
@@ -252,6 +255,9 @@ class MyTracer(object):
                 if self.port not in MyTracer.ports:
                     MyTracer.ports.add(self.port)
                     return
+            
+            # Sleep to avoid cpu thrashing
+            time.sleep(0.01)
 
     @classmethod
     def listen(cls):
@@ -272,13 +278,15 @@ class MyTracer(object):
                 addr = None
 
                 # Get the sema, then try to recieve
-                # Ergo we wait here untill a sending thread signals that we should wait for something
+                # Ergo we wait here untill a sending thread signals that we 
+                # should wait for something
                 cls.recieveSema.acquire()
 
                 try:
                     # Read from socket. Will timeout based on socket settings.
                     # Timeout will raise socket.error
-                    # We don't care about big packets. They are prolly not coming from us anyhow
+                    # We don't care about big packets. They are prolly not 
+                    # coming from us anyhow
                     data, addr = r4.recvfrom(1024)
                     
                     # Check that it is an ICMP package and its a 3 / 3 or 11 / 0
@@ -299,11 +307,14 @@ class MyTracer(object):
                         # Not ICMP, don't really know what to do here, skip it?
                         # lets skip it
                         continue
-                    elif not (data[20] == 11 and data[21] == 0) \
-                        and not (data[20] == 3 and data[21] == 0) \
-                        and not (data[20] == 3 and data[21] == 3) \
-                        and not (data[20] == 3 and data[21] == 10) \
-                        and not (data[20] == 3 and data[21] == 13):
+                    elif (not (data[20] == 11 and data[21] == 0) 
+                        and not (data[20] == 11 and data[21] == 3) 
+                        and not (data[20] == 11 and data[21] == 10) 
+                        and not (data[20] == 11 and data[21] == 13) 
+                        and not (data[20] == 3 and data[21] == 0) 
+                        and not (data[20] == 3 and data[21] == 3) 
+                        and not (data[20] == 3 and data[21] == 10) 
+                        and not (data[20] == 3 and data[21] == 13)):
                         # ICMP which is not 3/3-10-13 or 11/0
                         continue
 
@@ -443,12 +454,13 @@ class MyTracer(object):
                 raise IOError('Unable to resolve {}: {}', self.dst, e)
 
         # print something to output if we want to
-        text = 'traceroute to {} ({}), {} hops max'.format(
-            self.dst,
-            dst_ip.exploded,
-            self.hops
-        )
         if not self.quiet:
+            # print something to output if we want to
+            text = 'traceroute to {} ({}), {} hops max'.format(
+                self.dst,
+                dst_ip.exploded,
+                self.hops
+            )
             print(text)
 
         # creaty the query object we will but in the running queries
