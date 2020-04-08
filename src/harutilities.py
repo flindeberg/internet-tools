@@ -42,14 +42,21 @@ class urlutils:
         return urlparse(text, "http").geturl()
 
 class HarHost:
-    """ Class for storing host information, such as data transferred """
+    """ 
+        Class for storing host information, such as data transferred 
+        Also contains, after trace, information such as wether the trace was incomplete or full.
+    """
     def __init__(self, host, transfersize : int = -1, realsize : int = -1):
         self._host = host
         self._transfersize = transfersize
         self._realsize = realsize
-        self._ipstrace = dict() # str -> list[str]
-        self._astrace = dict() # str -> list[AS]
+        # str -> list[str]
+        self._ipstrace : Dict[ipaddress._BaseAddress, List[str]] = dict()
+        # str -> list[str]
+        self._astrace : Dict[ipaddress._BaseAddress, List[AS]] = dict()
+
         self._asnlookup = asnutils.ASNLookup() ## Lets use one lookup util per instance of har host
+        self._trace = edgeutils.TraceType.missing # start with assuming that the trace is missing
 
     def setASNLookup(self, lookup : asnutils.ASNLookup):
         """ Force a specific ASNLookup for this HarHost (could be useful for speed) """
@@ -58,7 +65,7 @@ class HarHost:
 
     @property 
     def ips(self):
-        return list(str(key) for key in self._ipstrace.keys())
+        return list(str(key) for key in self._ipstrace)
 
     def get_trace(self, ip: str):
         return self._ipstrace[ip]
@@ -161,10 +168,24 @@ class HarHost:
             if key not in traces:
                 raise ValueError("Could not find key '{:}' in traces!".format(key))
             ## Save the filtered list (i.e. we do not care about missing steps)
+            ## "*" represents a ttl without response in the tracer
+
+            ## HACK Should be fixed properly. It seems like it is very possible
+            ## to get router to ignore ICMPs due to icmp storm, 
+            if traces[key][0] == "*":
+                # lets replace it with a proper IP, if we have one
+                for tracedip, tracelist in traces.items():
+                    if tracelist[0] != "*":
+                        traces[key][0] = tracelist[0]
+                        #print("Updated trace to {:} with {:} at first hop"
+                        #        .format(key, v[0]))
+                        break
+
             filtered = list(filter(lambda x: x != "*", traces[key]))
             iplist = list(ipaddress.ip_address(x) for x in filtered)
             self._ipstrace[ipaddress.ip_address(key)] = iplist
-
+            ## Set the trace status, will be used for coloring later
+            self._trace = edgeutils.TraceType.getTraceStatus(traces[key])
 
     def populateAsns(self):
         """
@@ -174,19 +195,23 @@ class HarHost:
         # get an instance of the util, and look up the necessary ips
         asn = asnutils.ASNLookup()
         # many will just have one ip, but for those which have many we will trace many
-        for key in self._ipstrace:
-            asinfo = asn.lookupmanystr(self._ipstrace[key])
+        for key, ips in self._ipstrace.items():
+            asinfo = asn.lookupmanystr(ips)
         
             # build a new list of visited AS along the line
             self._astrace[key] = list()
 
-            for ip in self._ipstrace[key]:
+            for ip in ips:
                 # fetch the matching AS, it might be "bad", i.e. missing name if it doesn't exist
                 if ip in asinfo.ipas:
                     # if we cant match ip, just skip it
                     refas = asinfo.ipas[ip]
                     self._astrace[key].append(refas)
-            
+                    #print("Added {:} to {:}".format(refas, ip))
+                else:
+                    print("Could not find AS for {:}.".format(ip))
+        
+
     def getedges(self) -> asnutils.EdgeList:
         """
             Get a list of edges from the current host object. 
@@ -195,13 +220,13 @@ class HarHost:
         # Start with "localhost"
         edges = list()
         
-        lastNode = ("localhost", EdgeType.start)
         
-        for ipkey in self._astrace:
+        for ipkey, ips in self._astrace.items():
             # ipkey is ip
+            lastNode = ("localhost", EdgeType.start)
             # annotate for type help
             current: AS
-            for current in self._astrace[ipkey]:
+            for current in ips:
                 # current is here an AS    
                 country = pycountry.countries.get(alpha_2=current.cc)
 
@@ -209,21 +234,41 @@ class HarHost:
                 # current is ASN, lastNode might be "localhost" or ASN
                 # doublecheck that we are not referencing ourselves
                 if lastNode[0] != current.GetPrettyName():
-                    edges.append(EdgeTuple(lastNode[0], current.GetPrettyName(), 
-                                           lastNode[1], EdgeType.asn, lastNode[1], data=self.size))
+                    edges.append(EdgeTuple(lastNode[0], 
+                                           current.GetPrettyName(), 
+                                           lastNode[1], EdgeType.asn, 
+                                           lastNode[1], data=self.size))
                 
                 if country is not None: # only add countries which exist
                     # add country connection as well
-                    edges.append(EdgeTuple(country.name, current.GetPrettyName(), 
-                                           EdgeType.cc, EdgeType.asn, EdgeType.cc, data=current.asn))
+                    edges.append(EdgeTuple(country.name, 
+                                           current.GetPrettyName(), 
+                                           EdgeType.cc, EdgeType.asn, 
+                                           EdgeType.cc, data=current.asn))
 
                 # prepare for next round
                 lastNode = (current.GetPrettyName(), EdgeType.asn)
             
+            # If we have a full trace its a "host", else its an 
+            # "indirect host" (i.e. ihost)
+            hostedge : EdgeType
+            hostblobb : EdgeType
+
+            if (self._trace == edgeutils.TraceType.full 
+                or self._trace == edgeutils.TraceType.fullbutmid):
+                hostedge = EdgeType.host
+                hostblobb = EdgeType.host
+            else:
+                hostedge = EdgeType.ihost
+                hostblobb = EdgeType.ihost
+
             # We have added all but lastNode -> final host (IP)
             edges.append(EdgeTuple(lastNode[0], self._host, 
-                                lastNode[1], EdgeType.host, EdgeType.host))
+                                lastNode[1], hostblobb, hostedge))
         
+        #import pprint
+        #pprint.pprint(edges)
+
         # Now we have done all combinations
         return edges
 
@@ -455,36 +500,45 @@ class CheckHAR:
 
     def cook(self):
             """ Cooks the the Har so we can get the edges. Has to be called prior to getEdges """
+
+            # type hint them, we are reusing them
+            key: str
+            value: HarHost
+
             # go through all the hosts we use, and check paths and asns passed to get there
             print("Starting to resolve hosts")
-            for key in self.result.hosts:
-                self.result.hosts[key].resolve()
+            for key, value in self.result.hosts.items():
+                value.resolve()
 
             # Make sure we trace all ips
             ipstotrace = list()
             print("Collecting IPs to trace")
-            for key in self.result.hosts:
+            for key, value in self.result.hosts.items():
                 #self.result.hosts[key].trace()
-                ipstotrace.extend(self.result.hosts[key].getToTrace())
+                ipstotrace.extend(value.getToTrace())
 
             ## Trace all at the same time (due to GIL issues with Python...)
             print("Starting to trace hosts")
             traces = TraceManager.TraceAll(set(ipstotrace))
 
             print("Adding traces to hosts")
-            for key in self.result.hosts:
-                self.result.hosts[key].addTraces(traces)
+            for key, value in self.result.hosts.items():
+                value.addTraces(traces)
 
             # Now we have all hosts, their traceroutes (hopefully somewhat populated), 
             # now it is time to resolve their autonomous systems
             print("Starting to resolve autonomous systems from traces")
-            for key in self.result.hosts:
-                self.result.hosts[key].populateAsns()
+            for key, value in self.result.hosts.items():
+                value.populateAsns()
+
+                value._astrace
+
+            
 
     def getEdges(self, dohosts: bool = False, useHostnames: bool = False) -> asnutils.EdgeList:
             """ 
-            Gets all edges in asnutils.EdgeList 
-            Has to be called after 'cook()'
+                Gets all edges in asnutils.EdgeList.
+                Has to be called after 'cook()'
             """
 
             print("Constructing edges from routing information")
