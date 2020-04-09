@@ -193,7 +193,11 @@ class HarHost:
         """
 
         # get an instance of the util, and look up the necessary ips
-        asn = asnutils.ASNLookup()
+        asn : asnutils.ASNLookup
+        if self._asnlookup:
+            asn = self._asnlookup
+        else:
+            asn = asnutils.ASNLookup()
         # many will just have one ip, but for those which have many we will trace many
         for key, ips in self._ipstrace.items():
             asinfo = asn.lookupmanystr(ips)
@@ -539,7 +543,8 @@ class CheckHAR:
             for key, value in self.result.hosts.items():
                 value.populateAsns()
 
-                value._astrace
+            # HACK Call clean on the ASN lookup
+            self._asnlookup.clean()
 
             
 

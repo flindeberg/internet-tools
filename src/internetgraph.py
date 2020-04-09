@@ -85,13 +85,16 @@ def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='sfdp'):
             # lower weight for country codes
             # should not organize on their behalf
             weight = 24
-            length = 4
+            length = 6
         elif edge.edgeType == EdgeType.asn:
             weight = 2
             length = 5  
         elif edge.edgeType == EdgeType.host:
             weight = 8
             length = 1.5
+        elif edge.edgeType == EdgeType.company:
+            weight = 20
+            length = 4
 
         # add nodes and edges to graph model
         G.add_edge(edge.node1, edge.node2, weight=weight, length=length, len=length)
@@ -150,7 +153,7 @@ def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='sfdp'):
     wrappers[EdgeType.asn] = DrawWrapper(list(set(nodelist[EdgeType.asn])), edges[EdgeType.asn], "ASN", "o", textsize=4, nodesize=300, color="red")
     wrappers[EdgeType.cc] = DrawWrapper(list(set(nodelist[EdgeType.cc])), edges[EdgeType.cc], "Countries", "d", textsize=5, nodesize=400, color="green")
 
-    wrappers[EdgeType.company] = DrawWrapper(list(set(nodelist[EdgeType.company])), None, "Companies", "d", textsize=5, nodesize=400, color="purple")
+    wrappers[EdgeType.company] = DrawWrapper(list(set(nodelist[EdgeType.company])), edges[EdgeType.company], "Companies", "d", textsize=5, nodesize=400, color="purple")
 
     # All AS same color
     #wrappers["ASNedges"] = DrawWrapper(None, edges[EdgeType.asn], "ASN", "o", textsize=4, nodesize=300, color="red")

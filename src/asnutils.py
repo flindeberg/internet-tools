@@ -348,7 +348,8 @@ class ASNLookup:
           print("Issues with ip-address '{:}': {:}".format(ip, ve))
 
     # clean our dataset
-    self.clean()
+    # HACK We only call clean outside for now
+    #self.clean()
 
     # return what we created 
     return asinfo
@@ -358,7 +359,7 @@ class ASNLookup:
     
     # HACK Use fixed list for companies for now
     # TODO Use a smart list of companies?
-    masterlist = pd.Series(["Bahnhof", "Tele2", "Comhem", "Bredbandsbolaget", "Telenor", "Netnod", "Amazon", "Google", "Microsoft", "Edgecast", "Telia", "TDC", "Cogent", "Level3", "Cloudflare", "Linode", "Yahoo", "Twitter", "Facebook"])
+    masterlist = pd.Series(["Bahnhof", "Tele2", "Comhem", "Bredbandsbolaget", "Telenor", "Netnod", "Amazon", "Google", "Microsoft", "Edgecast", "Telia", "TDC", "Cogent", "Level3", "Cloudflare", "Linode", "Yahoo", "Twitter", "Facebook", "AMS-IX", "LINX"])
 
     # start with iterating through the items and clean the names of potential companies
     asentity : AS
@@ -401,10 +402,10 @@ class ASNLookup:
     # "Amazon" vs "AMAZON-AES" and "Amazon Technologies"
     # HACK Motivate a better cutoff?
     matches = match_most_similar(masterlist, companies, min_similarity=0.40)
-    print(match_strings(masterlist, companies, min_similarity=0.05))
+    #print(match_strings(masterlist, companies, min_similarity=0.05))
     #print(match_strings(companies, min_similarity=0.05))
 
-    print(complist)
+    #print(complist)
     
     for tup in zip(complist, matches):
       # tup[0] org name, [1], matched name
@@ -413,7 +414,7 @@ class ASNLookup:
         print("Merging presumtive company {:} with {:}".format(tup[0], tup[1]))
         ent : AS
         for ent in filter(lambda x: x.presumtivecompany == tup[0], self._asinfo.ipas.values()):
-          print("Setting {:} to {:}".format(ent.name, tup[1]))
+          #print("Setting {:} to {:}".format(ent.name, tup[1]))
           ent.company = tup[1]
 
 if __name__ == "__main__":
