@@ -16,6 +16,7 @@ from elevate import elevate
 
 import harutilities
 import internetgraph
+import parallelltracert
 from harutilities import urlutils
 
 
@@ -46,6 +47,9 @@ def main(arg=None):
 
     parser.add_argument('-o', '--output', 
                         help="output directory (everything goes here)")
+
+    parser.add_argument('-p', '--ports', type=int, default=100,
+                        help="number of ports used for tracing (defaults to 100)")
 
     if arg is not None:
         args = parser.parse_args(arg)
@@ -82,6 +86,14 @@ def main(arg=None):
         hostslist = list([i] for i in hosts)
     else:
         hostslist = [hosts]
+
+    # Setup tracer
+    if args.ports < 0:
+        print("Cannot use negative number of ports, defaulting to 100")
+        args.ports = 100
+
+    # set nr of ports
+    parallelltracert.TraceManager.SetPorts(args.ports)
 
     for hostset in hostslist:
 

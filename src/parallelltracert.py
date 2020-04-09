@@ -33,6 +33,7 @@
 # Issue is that the ipv6 packet when read as a buffer does not look as it 
 # does on the wire (i.e. when captured by wireshark), so ICMPv6 packets
 # don't have the required fields available.
+# I do not know why
 
 """
 Core module
@@ -51,13 +52,13 @@ import time
 ## Use threads, not processes (processes are harder to coordinate for small tasks, also larger overhead)
 from multiprocessing.pool import ThreadPool
 
-__all__ = ['MyTracer']
-__tracedebug__ = False
+__all__ = ['ParallellTracer']
+__tracedebug__ = False ## HACK for debug prints
 
 ## HACK empirically the cutoff seems to be around 33634
 ## standardswise this should not be an issue
+__MAXPORT__ = 33464
 #__MAXPORT__ = 33634
-__MAXPORT__ = 33454
 __MINPORT__ = 33434
 
 def dprint(x):
@@ -82,7 +83,13 @@ class TraceManager(object):
     __singleton = None
 
     ## Lets use one per port, works good enough
-    __pool = ThreadPool(__MAXPORT__ - __MINPORT__ + 1)
+    ##__pool = ThreadPool(__MAXPORT__ - __MINPORT__ + 1)
+    __pool : ThreadPool = None 
+
+    @classmethod
+    def SetPorts(cls, ports: int):
+        __MAXPORT__ == __MINPORT__ + ports - 1
+        cls.__pool = ThreadPool(__MAXPORT__ - __MINPORT__ + 1)
 
     @classmethod
     def Instance(cls):
@@ -92,6 +99,7 @@ class TraceManager(object):
 
         if not cls.__singleton:
             cls.__singleton = cls()
+            cls.__pool = ThreadPool(__MAXPORT__ - __MINPORT__ + 1)
 
         cls.__lock.release()
 
@@ -170,14 +178,16 @@ class TraceManager(object):
 
         self.__sema.release()
 
-        form = "Traced {:} ({:}/{:}, {:}%, {:} ongoing)"
+        form = "Traced {:} ({:}/{:}, {:}%, {:} ongoing), ports {:}-{:}"
         print (form.format(
             local_ip, 
             len(self.__traced.keys()), 
             (len(self.__tracing) + len(self.__traced.keys())),
             round(100 * (len(self.__traced.keys())) / 
                         (len(self.__tracing) + len(self.__traced.keys())),2),
-            len(self.__tracing)
+            len(self.__tracing),
+            __MINPORT__,
+            __MAXPORT__
         ))
 
         return res

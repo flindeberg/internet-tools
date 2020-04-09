@@ -162,7 +162,7 @@ def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='sfdp'):
     # for now defaulting to graphviz
     if graph_layout == 'sfdp':
         ## Default to using graphviz, better and faster..
-        graph_pos=nx.drawing.nx_agraph.graphviz_layout(G, prog='neato', root="localhost")
+        graph_pos=nx.drawing.nx_agraph.graphviz_layout(G, prog='neato', root="localhost", args="-Gmaxiter=200")
     elif graph_layout == 'spring':
         #graph_pos=nx.spring_layout(G, pos={startNode[0]: (0.5,0.5)}, fixed=startNode, iterations=150, scale=1)
         graph_pos=nx.spring_layout(G, iterations=150, scale=1)
