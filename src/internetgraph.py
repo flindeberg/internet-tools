@@ -66,32 +66,35 @@ def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='sfdp'):
     #print(graph)
 
     # create networkx graph
-    #G=nx.Graph()
-    G=nx.MultiDiGraph()
+    G=nx.Graph()
+    #G=nx.MultiDiGraph()
 
     # save the nodes for later
     nodes = list()
 
-    nodelist = {EdgeType.asn : list(), EdgeType.cc : list(), EdgeType.host : list(), EdgeType.ihost : list(), EdgeType.start : list()}
+    nodelist = {e : list() for e in EdgeType}
+    #nodelist = {EdgeType.asn : list(), EdgeType.cc : list(), EdgeType.host : list(), EdgeType.ihost : list(), EdgeType.start : list(), EdgeType.company : list()}
 
     # add edges
     for edge in graph:
+        
         ## assume ihost (i.e. indirect host, trace failed)
-        weight = 4
+        weight = 2
         length = 2
         if edge.edgeType == EdgeType.cc:
             # lower weight for country codes
-            weight = 2
+            # should not organize on their behalf
+            weight = 24
             length = 4
         elif edge.edgeType == EdgeType.asn:
-            weight = 1.5
-            length = 4
+            weight = 2
+            length = 5  
         elif edge.edgeType == EdgeType.host:
             weight = 8
-            length = 2
+            length = 1.5
 
         # add nodes and edges to graph model
-        G.add_edge(edge.node1, edge.node2, weight=weight, length=length)
+        G.add_edge(edge.node1, edge.node2, weight=weight, length=length, len=length)
         G.add_node(edge.node1)
         G.add_node(edge.node2)
 
@@ -147,6 +150,8 @@ def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='sfdp'):
     wrappers[EdgeType.asn] = DrawWrapper(list(set(nodelist[EdgeType.asn])), edges[EdgeType.asn], "ASN", "o", textsize=4, nodesize=300, color="red")
     wrappers[EdgeType.cc] = DrawWrapper(list(set(nodelist[EdgeType.cc])), edges[EdgeType.cc], "Countries", "d", textsize=5, nodesize=400, color="green")
 
+    wrappers[EdgeType.company] = DrawWrapper(list(set(nodelist[EdgeType.company])), None, "Companies", "d", textsize=5, nodesize=400, color="purple")
+
     # All AS same color
     #wrappers["ASNedges"] = DrawWrapper(None, edges[EdgeType.asn], "ASN", "o", textsize=4, nodesize=300, color="red")
 
@@ -154,7 +159,7 @@ def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='sfdp'):
     # for now defaulting to graphviz
     if graph_layout == 'sfdp':
         ## Default to using graphviz, better and faster..
-        graph_pos=nx.drawing.nx_agraph.graphviz_layout(G, prog='fdp', root="localhost")
+        graph_pos=nx.drawing.nx_agraph.graphviz_layout(G, prog='neato', root="localhost")
     elif graph_layout == 'spring':
         #graph_pos=nx.spring_layout(G, pos={startNode[0]: (0.5,0.5)}, fixed=startNode, iterations=150, scale=1)
         graph_pos=nx.spring_layout(G, iterations=150, scale=1)

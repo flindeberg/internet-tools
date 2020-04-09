@@ -31,6 +31,7 @@ class EdgeType(Enum):
     host = 2
     asn = 3
     cc = 4
+    company = 5
 
 @dataclass
 class EdgeTuple:

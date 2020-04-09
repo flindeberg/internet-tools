@@ -56,7 +56,8 @@ __tracedebug__ = False
 
 ## HACK empirically the cutoff seems to be around 33634
 ## standardswise this should not be an issue
-__MAXPORT__ = 33634
+#__MAXPORT__ = 33634
+__MAXPORT__ = 33454
 __MINPORT__ = 33434
 
 def dprint(x):

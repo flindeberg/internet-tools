@@ -246,6 +246,14 @@ class HarHost:
                                            EdgeType.cc, EdgeType.asn, 
                                            EdgeType.cc, data=current.asn))
 
+                # Handle company if present
+                if current.company is not None:
+                    edges.append(EdgeTuple(current.company, 
+                                           current.GetPrettyName(), 
+                                           EdgeType.company, EdgeType.asn, 
+                                           EdgeType.company))
+
+
                 # prepare for next round
                 lastNode = (current.GetPrettyName(), EdgeType.asn)
             

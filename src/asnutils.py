@@ -10,6 +10,14 @@ import json
 
 import edgeutils
 
+# clean company names
+import cleanco
+
+# match company names
+import pandas as pd
+import numpy as np
+from string_grouper import match_strings, match_most_similar, group_similar_strings, StringGrouper
+
 @dataclass
 class AS:
   """
@@ -23,11 +31,13 @@ class AS:
   #self.cc: str
   #self.exampleIp: str
 
-  def __init__(self, name : str, asn : int, cc : str, exampleIp : str):
+  def __init__(self, name : str, asn : int, cc : str, exampleIp : str, company : str = None):
     self.name = name
     self.asn = asn
     self.cc = cc
     self.exampleIp = exampleIp
+    self.company = company
+    self.presumtivecompany = self.company
 
   @classmethod
   def CreateFromDict(cls, ip, d): 
@@ -71,10 +81,10 @@ AsDict = Dict[int, AS]
 IpAsDict = Dict[ipaddress._BaseAddress, AS]
 
 class AsInfo(NamedTuple):
-  # ASN to AS mappings
-  ipas: AsDict = dict()
-  # IP to AS mapping
-  asas: IpAsDict = dict()
+  # IP to AS mappings
+  ipas: IpAsDict = dict()
+  # ASN to AS mapping
+  asas: AsDict = dict() # Type AsDict
 
 @dataclass
 class ASFind:
@@ -337,18 +347,82 @@ class ASNLookup:
       except ValueError as ve:
           print("Issues with ip-address '{:}': {:}".format(ip, ve))
 
+    # clean our dataset
+    self.clean()
+
     # return what we created 
     return asinfo
 
-      
-      
+  def clean(self):
+    """ Cleans the instance AS and adds companies were applicble """
+    
+    # HACK Use fixed list for companies for now
+    # TODO Use a smart list of companies?
+    masterlist = pd.Series(["Bahnhof", "Tele2", "Comhem", "Bredbandsbolaget", "Telenor", "Netnod", "Amazon", "Google", "Microsoft", "Edgecast", "Telia", "TDC", "Cogent", "Level3", "Cloudflare", "Linode", "Yahoo", "Twitter", "Facebook"])
+
+    # start with iterating through the items and clean the names of potential companies
+    asentity : AS
+    for asn, asentity in self._asinfo.asas.items():
+      co = cleanco.cleanco(asentity.name)
+      # Set both company name and name of the AS
+      # we will change companyname later (potentially)
+      asentity.name = co.clean_name()
+      #asentity.company = co.clean_name() 
+      asentity.presumtivecompany = co.clean_name()
+
+      # Special case for Sweden and the US; since they show up alot
+      # and share literals with others (i.e. "inc", "AB" etc)
+      # HACK Perhaps fix to something more beautiful
+      tmpco = co.country() # Issue with calling country in cleanco
+      # you can only call it once
+      if tmpco:
+        if "United States of America" in tmpco:
+          asentity.cc = "US"
+        elif "Sweden" in tmpco:
+          asentity.cc = "SE"
+
+      if asentity.cc is None and len(tmpco) == 1:
+        # try with name ("United States", "Sweden")
+        country = pycountry.countries.get(name=co.country[0])
+        if not country:
+          # try with official name 
+          # ("United States of America", "Royal Kingdom of Sweden")
+          country = pycountry.countries.get(official_name=co.country[0])
+
+        if country:  
+          asentity.cc = country.alpha_2
+
+    # we have gone through once and updated
+    # lets match
+    compsdict = {ent.presumtivecompany: ent for ent in self._asinfo.asas.values()}
+    complist = [k for k in compsdict]
+    companies = pd.Series(complist)
+    # 0.40 for match is arbitrary, and choses since it seems to catch 
+    # "Amazon" vs "AMAZON-AES" and "Amazon Technologies"
+    # HACK Motivate a better cutoff?
+    matches = match_most_similar(masterlist, companies, min_similarity=0.40)
+    print(match_strings(masterlist, companies, min_similarity=0.05))
+    #print(match_strings(companies, min_similarity=0.05))
+
+    print(complist)
+    
+    for tup in zip(complist, matches):
+      # tup[0] org name, [1], matched name
+      if tup[0] != tup[1]:
+        # we only need to do something if they differ
+        print("Merging presumtive company {:} with {:}".format(tup[0], tup[1]))
+        ent : AS
+        for ent in filter(lambda x: x.presumtivecompany == tup[0], self._asinfo.ipas.values()):
+          print("Setting {:} to {:}".format(ent.name, tup[1]))
+          ent.company = tup[1]
+
 if __name__ == "__main__":
   print ("Running utilities as main, not really useful")
   
   import pprint
 
   ## example trace, one local, one well known, one in amazons network which is not announced, and DNs
-  trace = ("2.18.74.134", ["192.168.0.1", "8.8.8.8", "52.93.2.80", "52.93.2.81", "2.18.74.134"])      
+  trace = ("2.18.74.134", ["192.168.0.1", "8.8.8.8", "52.93.2.80", "52.93.2.81", "2.18.74.134", "150.222.0.0"])      
   
   pprint.pprint(trace)
 
@@ -356,4 +430,4 @@ if __name__ == "__main__":
   res = asl.lookupmanystr(trace[1])
   
   
-  pprint.pprint(res)
+  #pprint.pprint(res)
