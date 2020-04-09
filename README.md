@@ -26,13 +26,17 @@ Chrome or Chromium is easily installed by either your package manager or by goog
 
 If you are missing `npm` head over to https://nodejs.org/en/download/ and download and install `npm` / `nodejs`.
 
+### Graphviz (partially optional)
+
+Graphviz is the most decent graph generator I have found, as such I really suggest it. Graphviz is available on most linux distributions and in `brew` for OSX.
+
 ### Python dependencies
 
 You also need som python modules, and of course python (3+) itself. Python is most easily downloaded from their homepage (https://www.python.org/downloads/) or your package manager of choice.
 
 When you have pip(3) installed, run the following:
 
-    pip3 install networkx matplotlib splinter bs4 pyasn dnspython pycountry elevate
+    pip3 install networkx matplotlib splinter bs4 pyasn dnspython pycountry elevate string-grouper cleanco pygraphviz
 
 Depending on system pip3 might not be aliased and instead pip should be used. Also some systems might require pip3 to be run as root (or use the `--user` flag to do a user install).
 
