@@ -32,14 +32,18 @@ class urlutils:
 
     @staticmethod
     def GetHostFromString(text: str):
-        matches = re.findall('https?://.*?/', text,re.MULTILINE)
+        matches = re.findall('http.s?://.*?/', text,re.MULTILINE)
         parsedhost = ('{uri.netloc}'.format(uri=r) for r in (urlparse(line) for line in matches))
         return parsedhost
 
     @staticmethod
     def EnsureFullURI(text: str) -> str:
         ## reparse so have have an explicit http
-        return urlparse(text, "http").geturl()
+        if not "://" in text:
+            text = "http://{:}".format(text)
+            
+        return urlparse(text).geturl()
+
 
 class HarHost:
     """ 
@@ -484,7 +488,9 @@ class CheckHAR:
                 self.result.start = d["log"]["pages"][0]["startedDateTime"]
 
             for entry in d["log"]["entries"]:
+                
                 parsedhost = urlutils.GetHostFromString(entry["request"]["url"])
+                
                 realsize = entry["request"]["headersSize"] + entry["request"]["bodySize"] + entry["response"]["headersSize"] + entry["response"]["bodySize"]
                 if "_transferSize" in entry["response"]:
                     transfersize = entry["response"]["_transferSize"]

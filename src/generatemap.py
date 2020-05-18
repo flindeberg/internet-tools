@@ -18,6 +18,7 @@ import harutilities
 import internetgraph
 import parallelltracert
 from harutilities import urlutils
+from urllib.parse import urlparse
 
 
 """
@@ -48,8 +49,8 @@ def main(arg=None):
     parser.add_argument('-o', '--output', 
                         help="output directory (everything goes here)")
 
-    parser.add_argument('-p', '--ports', type=int, default=100,
-                        help="number of ports used for tracing (defaults to 100)")
+    parser.add_argument('-p', '--ports', type=int, default=30,
+                        help="number of ports used for tracing (defaults to 30)")
 
     if arg is not None:
         args = parser.parse_args(arg)
@@ -89,7 +90,7 @@ def main(arg=None):
 
     # Setup tracer
     if args.ports < 0:
-        print("Cannot use negative number of ports, defaulting to 100")
+        print("Cannot use negative number of ports, defaulting to 30")
         args.ports = 100
 
     # set nr of ports
@@ -127,6 +128,7 @@ def main(arg=None):
                                             Path(fullharname).stem + ".png")
                     copyfile(chartname, tochart)
                     # use (i.e. open) copied file instead 
+                    # chartname will be opened in the end
                     chartname = tochart
                 
             if not args.quiet:
@@ -136,7 +138,8 @@ def main(arg=None):
                     opencmd = "open {:}".format(chartname)
                 elif platform.system() == "Linux":
                     opencmd = "xdg-open {:} &".format(chartname)
-                else:
+                else: # Lets just run the file itself, 
+                    # works on some platforms (including Windows)
                     opencmd = "{:}".format(chartname)
 
                 os.system(opencmd)
@@ -170,6 +173,15 @@ def GenerateHarFile(hostset, tmpdir : str, args):
         if args.output is not None:
             print ("Copying har-file to output")
             toharfile = os.path.join(args.output, harfilename)
+            if len(hostset) == 1:
+                # we have only one host, lets use smarter name
+                uri = urlparse(hostset[0])
+                toharfile  = os.path.join(
+                                        args.output, 
+                                        uri.netloc.replace(".", "_") + ".har")
+                print(hostset)
+                print("Moving har-file to {:}".format(toharfile))
+
             copyfile(harfullname, toharfile)
             #  change our reference so we used copied file instead
             harfullname = toharfile
