@@ -54,12 +54,15 @@ The most interesting tool to use quickly is the `generate_map.py`, which generat
 
 Some example usages:
 
-    ## Visit Washington Post and show the graph afterwards (-w for website)
-    sudo python3 generatemap.py -w www.nytimes.com www.cnn.com
+    ## Generatemap will always ask for priv-escalation unless found
+
+    ## Visit New York Times and CNN, and then show the graph (-w for website)
+    python3 generatemap.py -w www.nytimes.com www.cnn.com
     
-    ## Draw a single graph based on a har (or set of hars) and puts the graphs in "myoutputfolder"
-    sudo python3 generatemap.py -e inputfolder/some_data.har someotherfolder/some_data2.har -o myoutputfolder/
+    ## Draw a single graph based on a har (or set of hars) and put the graphs in "myoutputfolder"
+    python3 generatemap.py -e inputfolder/some_data.har someotherfolder/some_data2.har -o myoutputfolder/
     
     ## Draw separate graphs based on urls quietly (-s or --separate to do individual runs, -q or --quiet for no output)
-    sudo python3 generate_map.py -s -q washingtonpost.com nytimes.com cnn.com
+    python3 generatemap.py -s -q -w thesun.co.uk nytimes.com cnn.com -o testingsep
+    
 

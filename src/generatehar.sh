@@ -2,6 +2,19 @@
 ## first argument is input file
 ## second argument is output folder
 
+if [ -z "$1" ]
+then
+    echo "Missing input, provide a text-file with hosts to resolve"
+    exit
+else
+    if [ -f "$1" ]; then
+        echo "Using '$1' as input data"
+    else
+        echo "Input file '$1' does not exist!"
+        exit 1
+    fi
+fi
+
 if [ -z "$2" ]
 then
     folder=`echo $(date +'hars-%F-%T') | sed 's/:/_/g'`
@@ -42,7 +55,7 @@ if ! (pgrep -x ".*Chrom.*" > /dev/null) ; then
 
     ## --no-sandbox required for linux and root
     ##${browser} --remote-debugging-port=9222 --headless --content --disk-cache-dir=/dev/null --disable-gpu --download-whole-document --deterministic-fetch --net-log-capture-mode IncludeCookiesAndCredentials &> /dev/null &
-    "${browser}" --remote-debugging-port=9222 --no-sandbox --headless --content --disable-gpu --download-whole-document --deterministic-fetch --net-log-capture-mode IncludeCookiesAndCredentials &> /dev/null &
+    "${browser}" --remote-debugging-port=9222 --no-sandbox --headless --content --disable-gpu --download-whole-document --deterministic-fetch --disk-cache-size=0 --net-log-capture-mode=IncludeCookiesAndCredentials &> /dev/null &
 
     ## sometimes we have had issues here, sleeping lets Chrome properly boot up
     sleep 2
@@ -50,8 +63,10 @@ else
     echo "Did not start headless browser, trying to use existing"
 fi
     
-# Give each page 20 sec to load in total, and wait 3 sec after load
-xargs chrome-har-capturer -g 3000 -u 20000 -c -f -o $folder/run.har < $1
+# Give each page 20 sec to load in total, and wait 4 sec after load
+xargs chrome-har-capturer -n 4 -r 3 -g 4000 -u 20000 -c -f -o $folder/last_run.har < $1
+# HACK 
+# sleep a bit so the disk might stabilize (had issues on hdds)
 sleep .01
     
 echo "Cleaning Chrome process (pid $$)"

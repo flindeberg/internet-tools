@@ -12,6 +12,8 @@ from itertools import chain
 from pathlib import Path
 from shutil import copyfile
 
+from datetime import datetime
+
 from elevate import elevate
 
 import harutilities
@@ -83,8 +85,10 @@ def main(arg=None):
         ## just put an empty placeholder here
         hostslist = [None]
     elif args.separate:
+        # lists in list [[host1], [host2], etc]
         hostslist = list([i] for i in hosts)
     else:
+        # list in list [[host1, host2, etc]]
         hostslist = [hosts]
 
     # Setup tracer
@@ -123,8 +127,20 @@ def main(arg=None):
             
             if args.output is not None:
                     print ("Copying graph-file to output")
-                    tochart = os.path.join(args.output, 
+                    if Path(fullharname).stem == "run":
+                        # make a better name from the current time
+                        # HACK Do something smart out of the hosts we have
+                        # which supports resolving the same host multiple
+                        # times without name collision
+                        now = datetime.now()
+                        fmt = now.strftime("%Y%m%d_%H%M%S")
+                        tochart = os.path.join(args.output, 
+                                            fmt + ".png")
+                    else:
+                        # we have a decent name, hopefully
+                        tochart = os.path.join(args.output, 
                                             Path(fullharname).stem + ".png")
+                                            
                     copyfile(chartname, tochart)
                     # use (i.e. open) copied file instead 
                     chartname = tochart
@@ -198,12 +214,13 @@ def CreateHarFile(tmpfile, tmpdir : str):
 
 def is_root():
     return os.getuid() == 0
+    
 
 if __name__ == "__main__":
     
     if not is_root():
         # check for root and elevate
-        print("Tracing will require root, restarting with sudo")
+        print("Tracing will require root, trying to elevate")
         print("[If you do not trust this application, do not continue]")
         elevate(show_console=False, graphical=False)
         print("Elevated, restarting application as root")
