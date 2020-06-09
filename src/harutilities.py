@@ -32,7 +32,7 @@ class urlutils:
 
     @staticmethod
     def GetHostFromString(text: str):
-        matches = re.findall('http.s?://.*?/', text,re.MULTILINE)
+        matches = re.findall('https?://.*?/', text,re.MULTILINE)
         parsedhost = ('{uri.netloc}'.format(uri=r) for r in (urlparse(line) for line in matches))
         return parsedhost
 
@@ -145,10 +145,11 @@ class HarHost:
             
         except:
             # DNS resolution messed up, such as host cannot be resolved
-            print("Unexpected error:", sys.exc_info()[0])
-            print("Unexpected error:", sys.exc_info())
+            #print("Unexpected error:", sys.exc_info()[0])
+            print("Unexpected error (for {:}): {:}".format(self._host, sys.exc_info()))
             ## put it in the list, that way we still keep it even though we could not resolve it
-    
+            
+
     def getToTrace(self):
         """ Helper func for future refactoring """
         return self.ips
