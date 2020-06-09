@@ -211,6 +211,8 @@ def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='sfdp'):
     #plt.show()
     #plt.savefig(file, format='png', dpi=1000, pad_inches=0.3)
     plt.savefig(file, format='png', dpi=350, pad_inches=0.3)
+    plt.savefig(file, format='svg', dpi=350, pad_inches=0.3)
+    plt.savefig(file, format='eps', dpi=350, pad_inches=0.3)
     plt.gcf().clear()
     print("Graph-png saved to {:}".format(file))
 
