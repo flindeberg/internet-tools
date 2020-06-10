@@ -18,6 +18,27 @@ import pandas as pd
 import numpy as np
 from string_grouper import match_strings, match_most_similar, group_similar_strings, StringGrouper
 
+
+## TLS adapted for workaround
+import requests
+from requests import adapters
+import ssl
+from urllib3 import poolmanager
+
+
+class TLSAdapter(adapters.HTTPAdapter):
+
+    def init_poolmanager(self, connections, maxsize, block=False):
+        """Create and initialize the urllib3 PoolManager."""
+        ctx = ssl.create_default_context()
+        ctx.set_ciphers('DEFAULT@SECLEVEL=1')
+        self.poolmanager = poolmanager.PoolManager(
+                num_pools=connections,
+                maxsize=maxsize,
+                block=block,
+                ssl_version=ssl.PROTOCOL_TLS,
+                ssl_context=ctx)
+
 @dataclass
 class AS:
   """
@@ -149,6 +170,8 @@ class ASNLookup:
     # Our presumed object
     self._asinfo = AsInfo()
 
+    
+
   def lookupmanystr(self, ips: List[str]) -> AsInfo:
     """ Looks up AsInfo from a list of IP-addresses in string-type """
     ipstyped = list()
@@ -216,8 +239,14 @@ class ASNLookup:
               ## Lets create it
               print("IP-address {:} is not announced, looking for it with RDAP towards ARIN.".format(ip.exploded))
               url = ASNLookup.__urlrdap.format(ip)
-              with urllib.request.urlopen(url) as rdap:
-                data = json.loads(rdap.read().decode())
+
+              session = requests.session()
+              session.mount('https://', TLSAdapter())
+
+              with session.get(url) as rdap:
+              #with urllib.request.urlopen(url) as rdap:
+                data = json.loads(rdap.content.decode())
+                #data = json.loads(rdap.read().decode())
                 ## handle json
                 start = ipaddress.ip_address(data["startAddress"]) #ip
                 end = ipaddress.ip_address(data["endAddress"]) #ip

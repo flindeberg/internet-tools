@@ -123,29 +123,32 @@ def main(arg=None):
 
         ## create the graph
         with tempfile.NamedTemporaryFile() as tmpfile:
-            chartname = tmpfile.name + ".png"
-            internetgraph.draw_graph(edges, chartname)
+            chartname = tmpfile.name # + ".png"
+            files = internetgraph.draw_graph(edges, chartname)
             
             if args.output is not None:
-                    print ("Copying graph-file to output")
-                    if Path(fullharname).stem == "run":
-                        # make a better name from the current time
-                        # HACK Do something smart out of the hosts we have
-                        # which supports resolving the same host multiple
-                        # times without name collision
-                        now = datetime.now()
-                        fmt = now.strftime("%Y%m%d_%H%M%S")
-                        tochart = os.path.join(args.output, 
-                                            fmt + ".png")
-                    else:
-                        # we have a decent name, hopefully
-                        tochart = os.path.join(args.output, 
-                                            Path(fullharname).stem + ".png")
-                                            
-                    copyfile(chartname, tochart)
-                    # use (i.e. open) copied file instead 
-                    # chartname will be opened in the end
-                    chartname = tochart
+                print ("Copying graph-file to output")
+                if Path(fullharname).stem == "run":
+                    # make a better name from the current time
+                    # HACK Do something smart out of the hosts we have
+                    # which supports resolving the same host multiple
+                    # times without name collision
+                    now = datetime.now()
+                    fmt = now.strftime("%Y%m%d_%H%M%S")
+                    tochart = os.path.join(args.output, 
+                                        fmt)
+                else:
+                    # we have a decent name, hopefully
+                    tochart = os.path.join(args.output, 
+                                        Path(fullharname).stem)
+                
+                for f in files:
+                    copyfile(f, Path(tochart).with_suffix(f.suffix))
+
+                # use (i.e. open) copied file instead 
+                # chartname will be opened in the end
+                # use first
+                chartname = files[0]
                 
             if not args.quiet:
                 print("Opening the graph (might take a while for big graphs)")

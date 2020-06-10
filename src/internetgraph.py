@@ -16,6 +16,9 @@ import asnutils
 import harutilities
 from harutilities import EdgeType
 
+## To rename files / eps / etc
+from pathlib import Path
+
 @dataclass
 class DrawWrapper:
     ## Contains nodes, colors, sizes etc
@@ -60,7 +63,7 @@ def get_color(nr: int, all: int):
     res = np.array(cm.autumn(fact))[None, :]
     return res
 
-def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='sfdp'):
+def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='sfdp') -> List[Path]:
 
     # just dump it
     #print(graph)
@@ -210,11 +213,25 @@ def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='sfdp'):
     
     #plt.show()
     #plt.savefig(file, format='png', dpi=1000, pad_inches=0.3)
-    plt.savefig(file, format='png', dpi=350, pad_inches=0.3)
-    plt.savefig(file, format='svg', dpi=350, pad_inches=0.3)
-    plt.savefig(file, format='eps', dpi=350, pad_inches=0.3)
+
+    # loop over file endings
+    p = Path(file)
+    # png gives useful bitmap which can be opened everywhere
+    # svg is better
+    types = ["png","svg"]
+    files =[]
+    for t in types:
+        f = p.with_suffix(".{:}".format(t))
+        files.append(f)
+        plt.savefig(f, format=t, dpi=1000, pad_inches=0.3)
+        print("Graph-{:} saved to {:}".format(t,f))
+    
+    #plt.savefig(p.with_suffix(".png"), format='png', dpi=350, pad_inches=0.3)
+    #plt.savefig(p.with_suffix(".svg"), format='svg', dpi=350, pad_inches=0.3)
+    #plt.savefig(p.with_suffix(".eps"), format='eps', dpi=350, pad_inches=0.3)
     plt.gcf().clear()
-    print("Graph-png saved to {:}".format(file))
+    return files
+    
 
 if __name__ == "__main__":
     print("Did you really intend to run this as main?")
