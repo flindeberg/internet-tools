@@ -154,17 +154,17 @@ def main(arg=None):
                 print("Opening the graph (might take a while for big graphs)")
                 import platform
                 if platform.system() == "Darwin":
-                    opencmd = "open {:}".format(chartname)
+                    opencmd = "open {:}.svg".format(chartname)
                 elif platform.system() == "Linux":
-                    opencmd = "xdg-open {:} &".format(chartname)
+                    opencmd = "xdg-open {:}.svg &".format(chartname)
                 else: # Lets just run the file itself, 
                     # works on some platforms (including Windows)
-                    opencmd = "{:}".format(chartname)
+                    opencmd = "{:}.svg".format(chartname)
 
                 os.system(opencmd)
 
 def CreateFolder(args):
-    print ("Creating ouput folder")
+    print ("Creating output folder")
     os.makedirs(args.output)
 
 def GenerateHarFile(hostset, tmpdir : str, args):

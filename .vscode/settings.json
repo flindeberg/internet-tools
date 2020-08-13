@@ -2,5 +2,14 @@
   "python.pythonPath": "/usr/bin/python3",
   "editor.fontFamily": "Source Code Pro for Powerline",
   "debug.console.fontFamily": "Source Code Pro for Powerline",
-  "terminal.integrated.fontFamily": "Source Code Pro for Powerline"
+  "terminal.integrated.fontFamily": "Source Code Pro for Powerline",
+  "cSpell.words": [
+    "fullharname",
+    "harfilename",
+    "harfullname",
+    "hsnewlines",
+    "opencmd",
+    "tochart",
+    "toharfile"
+  ]
 }

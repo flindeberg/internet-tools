@@ -26,6 +26,9 @@ if hash chromium-browser 2>/dev/null; then
     browser=chromium-browser
     ## prefer chromium over chrome, obviously..
     echo "Found chromium-browser on path!"
+elif hash chromium 2>/dev/null; then
+    browser=chromium
+    echo "Found chromium-browser on path!"
 elif hash chrome-browser 2>/dev/null; then
     browser=chrome-browser
     echo "Found chrome-browser on path!"
@@ -43,19 +46,24 @@ elif command -v /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome 2
     echo "Found OSX and Chrome browser"
 else
     echo "No compatible browser found!"
-    exit
+    exit 1
 fi
 
 # ensure that we have the folder
 mkdir -p $folder
 
+flags="--remote-debugging-port=9222 --no-sandbox --headless --content --disable-gpu --download-whole-document --deterministic-fetch --disk-cache-size=0 --net-log-capture-mode=IncludeCookiesAndCredentials"
+
 # start chrome if not running
-if ! (pgrep -x ".*Chrom.*" > /dev/null) ; then
+if ! (pgrep -f ".*$flags" > /dev/null) ; then
     echo "Starting headless browser ($browser)"
 
     ## --no-sandbox required for linux and root
     ##${browser} --remote-debugging-port=9222 --headless --content --disk-cache-dir=/dev/null --disable-gpu --download-whole-document --deterministic-fetch --net-log-capture-mode IncludeCookiesAndCredentials &> /dev/null &
-    "${browser}" --remote-debugging-port=9222 --no-sandbox --headless --content --disable-gpu --download-whole-document --deterministic-fetch --disk-cache-size=0 --net-log-capture-mode=IncludeCookiesAndCredentials &> /dev/null &
+    startcmd="${browser} $flags 2> /dev/null"
+    ##"${browser}" --remote-debugging-port=9222 --no-sandbox --headless --content --disable-gpu --download-whole-document --deterministic-fetch --disk-cache-size=0 --net-log-capture-mode=IncludeCookiesAndCredentials &> /dev/null &
+    echo "Starting $startcmd"
+    $startcmd &
 
     ## sometimes we have had issues here, sleeping lets Chrome properly boot up
     sleep 2
@@ -64,7 +72,9 @@ else
 fi
     
 # Give each page 20 sec to load in total, and wait 4 sec after load
-xargs chrome-har-capturer -n 4 -r 3 -g 4000 -u 20000 -c -f -o $folder/last_run.har < $1
+xargs chrome-har-capturer --retry 3 --grace 4000 --timeout 20000 --abort-on-failure -o $folder/last_run.har < $1
+#xargs chrome-har-capturer -o $folder/last_run.har < $1
+
 # HACK 
 # sleep a bit so the disk might stabilize (had issues on hdds)
 sleep .01
