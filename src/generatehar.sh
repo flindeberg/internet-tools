@@ -59,11 +59,11 @@ if ! (pgrep -f ".*$flags" > /dev/null) ; then
     echo "Starting headless browser ($browser)"
 
     ## --no-sandbox required for linux and root
-    ##${browser} --remote-debugging-port=9222 --headless --content --disk-cache-dir=/dev/null --disable-gpu --download-whole-document --deterministic-fetch --net-log-capture-mode IncludeCookiesAndCredentials &> /dev/null &
-    startcmd="${browser} $flags 2> /dev/null"
-    ##"${browser}" --remote-debugging-port=9222 --no-sandbox --headless --content --disable-gpu --download-whole-document --deterministic-fetch --disk-cache-size=0 --net-log-capture-mode=IncludeCookiesAndCredentials &> /dev/null &
+    ##${browser} --remote-debugging-port=9222 --headless --content --disk-cache-dir=/dev/null --disable-gpu --download-whole-document --deterministic-fetch --net-log-capture-mode IncludeCookiesAndCredentials &> /dev/null 
+    startcmd="${browser} $flags"
+    ##"${browser}" --remote-debugging-port=9222 --no-sandbox --headless --content --disable-gpu --download-whole-document --deterministic-fetch --disk-cache-size=0 --net-log-capture-mode=IncludeCookiesAndCredentials &> /dev/null 
     echo "Starting $startcmd"
-    $startcmd &
+    $startcmd & > /dev/null 
 
     ## sometimes we have had issues here, sleeping lets Chrome properly boot up
     sleep 2
@@ -72,6 +72,7 @@ else
 fi
     
 # Give each page 20 sec to load in total, and wait 4 sec after load
+echo "Starting chrome-har-capturer"
 xargs chrome-har-capturer --retry 3 --grace 4000 --timeout 20000 --abort-on-failure -o $folder/last_run.har < $1
 #xargs chrome-har-capturer -o $folder/last_run.har < $1
 
