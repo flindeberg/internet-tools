@@ -7,6 +7,7 @@ class TraceType(Enum):
     fullbutmid = 2 # all missing hosts are in the middle
     missing = 3 # some other form
 
+
     @classmethod
     def getTraceStatus(cls, trace: list):
         ## Set the tracing flags
@@ -20,7 +21,7 @@ class TraceType(Enum):
             # lets check if they are all at the end
             # shallow copy to be on the safe side (remove later?)
             rev = trace.copy()
-            while rev[-1] == "*":
+            while rev[-1] == "*" and len(rev) > 0:
                 rev = rev[:-1]
             # now we have removed the end *:s, lets see if we still have any
             return TraceType.fullbutend if "*" not in rev else TraceType.missing
