@@ -31,6 +31,11 @@ jobs:
       run: |
         sudo apt install npm chromium-browser
         sudo npm install --global chrome-har-capturer
+    - name: Prepare pyasn with fresh data
+      run: |
+        cd src
+        ./updatepyasnfiles.sh
     - name: Test simple pages
       run: |
-        src/generatemap -w www.dn.se www.svd.se -o newssites
+        cd src
+        ./generatemap.py -w www.dn.se www.svd.se -o newssites
