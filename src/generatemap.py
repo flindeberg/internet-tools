@@ -148,18 +148,18 @@ def main(arg=None):
                 # use (i.e. open) copied file instead 
                 # chartname will be opened in the end
                 # use first
-                chartname = files[0]
+                chartname = Path(tochart).with_suffix(files[-1].suffix)
                 
             if not args.quiet:
                 print("Opening the graph (might take a while for big graphs)")
                 import platform
                 if platform.system() == "Darwin":
-                    opencmd = "open {:}.svg".format(chartname)
+                    opencmd = "open {:}".format(chartname)
                 elif platform.system() == "Linux":
-                    opencmd = "xdg-open {:}.svg &".format(chartname)
+                    opencmd = "xdg-open {:} &".format(chartname)
                 else: # Lets just run the file itself, 
                     # works on some platforms (including Windows)
-                    opencmd = "{:}.svg".format(chartname)
+                    opencmd = "{:}".format(chartname)
 
                 os.system(opencmd)
 
