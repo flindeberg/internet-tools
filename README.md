@@ -1,4 +1,7 @@
 # internet-tools
+
+![Github test all](https://github.com/flindeberg/internet-tools/workflows/Build%20and%20test%20CI/badge.svg)
+
 A collection of python tools useful in an Internet context.
 
 In particular these functions are of interest:
