@@ -423,6 +423,14 @@ class ASNLookup:
     # lets match
     compsdict = {ent.presumtivecompany: ent for ent in self._asinfo.asas.values()}
     complist = [k for k in compsdict]
+
+    if len(complist) == 0:
+      print("Empty company list! {:}".format(complist))
+      return
+    elif all(item == None for item in complist):
+      print("All AS are None! {:}".format(complist))
+      return
+
     companies = pd.Series(complist)
     # 0.40 for match is arbitrary, and choses since it seems to catch 
     # "Amazon" vs "AMAZON-AES" and "Amazon Technologies"
