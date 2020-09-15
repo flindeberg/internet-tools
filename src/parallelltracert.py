@@ -52,7 +52,7 @@ import time
 ## Use threads, not processes (processes are harder to coordinate for small tasks, also larger overhead)
 from multiprocessing.pool import ThreadPool
 
-__all__ = ['ParallellTracer']
+__all__ = ['TraceManager']
 __tracedebug__ = False ## HACK for debug prints
 
 ## HACK empirically the cutoff seems to be around 33634
