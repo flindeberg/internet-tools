@@ -26,6 +26,10 @@ Chrome or Chromium is easily installed by either your package manager or by goog
 
 If you are missing `npm` head over to https://nodejs.org/en/download/ and download and install `npm` / `nodejs`.
 
+### Graphviz (partially optional)
+
+Graphviz is the most decent graph generator I have found, as such I really suggest it. Graphviz is available on most linux distributions and in `brew` for OSX.
+
 ### Python dependencies
 
 You also need som python modules, and of course python (3+) itself. Python is most easily downloaded from their homepage (https://www.python.org/downloads/) or your package manager of choice.
@@ -50,12 +54,15 @@ The most interesting tool to use quickly is the `generate_map.py`, which generat
 
 Some example usages:
 
-    ## Visit Washington Post and show the graph afterwards (-w for website)
-    sudo python3 generatemap.py -w www.nytimes.com www.cnn.com
+    ## Generatemap will always ask for priv-escalation unless found
+
+    ## Visit New York Times and CNN, and then show the graph (-w for website)
+    python3 generatemap.py -w www.nytimes.com www.cnn.com
     
-    ## Draw a single graph based on a har (or set of hars) and puts the graphs in "myoutputfolder"
-    sudo python3 generatemap.py -e inputfolder/some_data.har someotherfolder/some_data2.har -o myoutputfolder/
+    ## Draw a single graph based on a har (or set of hars) and put the graphs in "myoutputfolder"
+    python3 generatemap.py -e inputfolder/some_data.har someotherfolder/some_data2.har -o myoutputfolder/
     
     ## Draw separate graphs based on urls quietly (-s or --separate to do individual runs, -q or --quiet for no output)
-    sudo python3 generate_map.py -s -q washingtonpost.com nytimes.com cnn.com
+    python3 generatemap.py -s -q -w thesun.co.uk nytimes.com cnn.com -o testingsep
+    
 

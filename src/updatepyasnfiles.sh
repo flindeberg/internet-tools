@@ -14,7 +14,7 @@ if hash pyasn_util_download.py 2>/dev/null; then
     pyasn_util_asnames.py -o pyasn.json
 else
     echo "Did not find pyasn tools. Did you install pyasn?"
-    echo "pip3 install pyasn"
+    echo "  pip3 install pyasn  "
 fi
 
 

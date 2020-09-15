@@ -1,6 +1,7 @@
+#!/usr/bin/env python3
 # to allow for proper annotations and class structures
 from __future__ import annotations
-# Copyright (c) 2019 Fredrik Lindeberg <flindeberg@gmail.com>
+# Copyright (c) 2019, 2020 Fredrik Lindeberg <flindeberg@gmail.com>
 # All rights reserved.
 
 import functools
@@ -19,21 +20,18 @@ import dns.resolver
 import pyasn
 import pycountry
 
+## local imports
 from parallelltracert import TraceManager
+import edgeutils
+import asnutils
+from edgeutils import EdgeTuple, EdgeType
+from asnutils import AS
 
-
-class EdgeType(Enum):
-    start = 0
-    ihost = 1
-    host = 2
-    asn = 3
-    cc = 4
-
-# Manipulation of string and urls
+## Manipulation of string and urls
 class urlutils:
 
     @staticmethod
-    def GetHostFromString(text: str) -> str:
+    def GetHostFromString(text: str):
         matches = re.findall('https?://.*?/', text,re.MULTILINE)
         parsedhost = ('{uri.netloc}'.format(uri=r) for r in (urlparse(line) for line in matches))
         return parsedhost
@@ -41,107 +39,257 @@ class urlutils:
     @staticmethod
     def EnsureFullURI(text: str) -> str:
         ## reparse so have have an explicit http
-        return urlparse(text, "http").geturl()
+        if not "://" in text:
+            text = "http://{:}".format(text)
+            
+        return urlparse(text).geturl()
 
 
-@dataclass
-class EdgeTuple:
-    ### Class to represent edges before drawing them
-    ## Contains necessary meta-information
-    node1: object
-    node2: object
-    node1type: EdgeType = None
-    node2type: EdgeType = None
-    edgeType: EdgeType = None
-    data: object = None
+class HarHost:
+    """ 
+        Class for storing host information, such as data transferred 
+        Also contains, after trace, information such as wether the trace was incomplete or full.
+    """
+    def __init__(self, host, transfersize : int = -1, realsize : int = -1):
+        self._host = host
+        self._transfersize = transfersize
+        self._realsize = realsize
+        # str -> list[str]
+        self._ipstrace : Dict[ipaddress._BaseAddress, List[str]] = dict()
+        # str -> list[str]
+        self._astrace : Dict[ipaddress._BaseAddress, List[AS]] = dict()
 
-    def __hash__(self):
-        return self.node1.__hash__() + self.node2.__hash__() + self.edgeType.__hash__()
+        self._asnlookup = asnutils.ASNLookup() ## Lets use one lookup util per instance of har host
+        self._trace = edgeutils.TraceType.missing # start with assuming that the trace is missing
 
-    def __eq__(self, x):
-        return self.__hash__() == x.__hash__()
-
-@dataclass
-class AS:
-    ### Class to represent-AS entities
-    #self.name: str
-    #self.asn: int
-    #self.cc: str
-    #self.exampleIp: str
-
-    def __init__(self, name : str, asn : int, cc : str, exampleIp : str):
-        self.name = name
-        self.asn = asn
-        self.cc = cc
-        self.exampleIp = exampleIp
-
-    @classmethod
-    def CreateFromDict(cls, ip, d) -> AS: 
-        ## just create and return
-        ## d is assumed to come from cymruwhois
-        return AS(d.owner,d.asn,d.cc,ip)
-
-    @classmethod
-    def CreateFromPyasnStr(cls, ip: str, asn: int, s: str) -> AS:
-        ## create and return basically.
-        if s is not None:
-            country = pycountry.countries.get(alpha_2=s[-2:])
-            if country is not None:
-                country = country.name
-        else: 
-            country = ""
-
-        return AS(s,asn,country,ip)
+    def setASNLookup(self, lookup : asnutils.ASNLookup):
+        """ Force a specific ASNLookup for this HarHost (could be useful for speed) """
+        self._asnlookup = lookup
 
 
-    def GetPrettyName(self) -> str:
-        ## Gets a pretty representation of the AS
-        ## for now "AS full name (ASN)", i.g. "Google LLC (1234)"
-        return "{:} ({:})".format(self.name, self.asn)
+    @property 
+    def ips(self):
+        return list(str(key) for key in self._ipstrace)
 
-    def __str__(self):
-        return self.GetPrettyName()
+    def get_trace(self, ip: str):
+        return self._ipstrace[ip]
 
-## Type aliases
-AsList = List[AS]
-EdgeList = List[EdgeTuple]
-AsDict = Dict[int, AS]
-IpAsDict = Dict[str, AS]
+    @property
+    def host(self):
+        return self._host
 
-class AsInfo(NamedTuple):
-    ipas: AsDict = dict()
-    asas: IpAsDict = dict()
+    @property
+    def size(self):
+        if self._realsize > 0:
+            return self._realsize
+        else:
+            return self._transfersize
 
+    def merge(self, otherHost : HarHost):
+        "merges other host into this host instance"
+        if self._host != otherHost.host:
+            raise ValueError("Hosts do not match!")
 
-class ASNLookup:
-    """ Class for looking up ASN data """
-    # currently based on pyasn, and has to be. They have the correct data
+        self._transfersize += otherHost._transfersize
+        self._realsize += otherHost._realsize
 
-    def __init__(self):
-        # load all names and pyas
-        self.p = pyasn.pyasn("pyasn.dat", "pyasn.json")
+    def resolve(self):
+        """Resolves this harhost via dns.resolver.query (dnspython).
+            TODO Strategy pattern so we can change resolver if needed
 
-    def lookupmany(self, ips: List[str]) -> AsInfo:
+        Args:
+            None
+
+        Returns:
+            Nothing
+
+        Raises:
+            Nothing
+
+        """
+
+        try:
+            ## find both a (ipv4) and aaaa (ipv6) records
+            ##dns.resolver
+            #ips = DNS.dnslookup(h, "a")
+            ips = (a.address for a in dns.resolver.query(self._host, "A"))
+            # IPv6 fails in the tracer. So lets skip it for now
+            #ips6 = (a.address for a in dns.resolver.query(h, "AAAA"))
+            #if ips6 is not None:
+            #    ips.extend(ips6)
+
+            for ip in ips:
+                try:
+                    ## dnspython v2 vs v1.5 has different behaviour here, lets keep backwards comp
+
+                    ## ip_inner is thrown and useless, but we need to check if "ip" is an actual ip 
+                    ## in terms of format, and not a host (as the case in a cname -> cname -> a chain)
+                    ip_inner = ipaddress.ip_address(ip)
+                    ## here we know it is an ip
+                    ## locallistips.append(ip_inner.exploded)
+                    ## cache so we can do a reverse lookup quick
+                    #ipname[ip_inner.exploded] = h.host
+
+                    ## add it to the host as well
+                    ## store it in the dict, which we populate later
+                    self._ipstrace[ip_inner] = None
+
+                except ValueError as e:
+                    ## Probably a host (e.g. xxx.yyy.zzz.akamai.com or so via cname)
+                    print("Not an IP, skipping: {:} ({:})".format(ip, e))
+                except TypeError as e:
+                    ## Something else is fishy
+                    print("Not an IP, skipping: {:} ({:})".format(ip, e))
+                except:
+                    print("Unexpected error:", sys.exc_info())
+            
+        except:
+            # DNS resolution messed up, such as host cannot be resolved
+            #print("Unexpected error:", sys.exc_info()[0])
+            print("Unexpected error (for {:}): {:}".format(self._host, sys.exc_info()))
+            ## put it in the list, that way we still keep it even though we could not resolve it
+            
+
+    def getToTrace(self):
+        """ Helper func for future refactoring """
+        return self.ips
+
+    def trace(self):
+        """
+            Does a trace route for all applicable IPS
+            TODO Add support for IPv6, currently failing due to unknown reasons
+        """
+        ## TODO Tracemanager does not handle IP class!
+        traces = TraceManager.TraceAll(self.ips)
         
-        asinfo = AsInfo()
+        self.addTraces(traces)
 
-        # go through ips and resolve  them
-        for ip in ips:
-            try:
-                # tuple, 0 = asn, 1 = prefix
-                r = self.p.lookup(ip)
-                name = self.p.get_as_name(r[0])
-                asn = AS.CreateFromPyasnStr(ip, r[0], name)
+    def addTraces(self, traces: Dict[ipaddress._BaseAddress, list]):
+        """
+            Helper function for adding traces back to HarHost
+        """
+        # TODO take care of the case if it is missing in traces?
+        for key in self.ips:
+            if key not in traces:
+                raise ValueError("Could not find key '{:}' in traces!".format(key))
+            ## Save the filtered list (i.e. we do not care about missing steps)
+            ## "*" represents a ttl without response in the tracer
 
-                # lets create both dictionaries for now
-                asinfo.ipas[ip] = asn
-                asinfo.asas[r[0]] = asn
+            ## HACK Should be fixed properly. It seems like it is very possible
+            ## to get router to ignore ICMPs due to icmp storm, 
+            if traces[key][0] == "*":
+                # lets replace it with a proper IP, if we have one
+                for tracedip, tracelist in traces.items():
+                    if tracelist[0] != "*":
+                        traces[key][0] = tracelist[0]
+                        #print("Updated trace to {:} with {:} at first hop"
+                        #        .format(key, v[0]))
+                        break
 
-            except ValueError as ve:
-                print("Issues with ip-address '{:}': {:}".format(ip, ve))
+            filtered = list(filter(lambda x: x != "*", traces[key]))
+            iplist = list(ipaddress.ip_address(x) for x in filtered)
+            self._ipstrace[ipaddress.ip_address(key)] = iplist
+            ## Set the trace status, will be used for coloring later
+            self._trace = edgeutils.TraceType.getTraceStatus(traces[key])
+
+    def populateAsns(self):
+        """
+            Looks up ASNS data
+        """
+
+        # get an instance of the util, and look up the necessary ips
+        asn : asnutils.ASNLookup
+        if self._asnlookup:
+            asn = self._asnlookup
+        else:
+            asn = asnutils.ASNLookup()
+        # many will just have one ip, but for those which have many we will trace many
+        for key, ips in self._ipstrace.items():
+            asinfo = asn.lookupmanystr(ips)
+        
+            # build a new list of visited AS along the line
+            self._astrace[key] = list()
+
+            for ip in ips:
+                # fetch the matching AS, it might be "bad", i.e. missing name if it doesn't exist
+                if ip in asinfo.ipas:
+                    # if we cant match ip, just skip it
+                    refas = asinfo.ipas[ip]
+                    self._astrace[key].append(refas)
+                    #print("Added {:} to {:}".format(refas, ip))
+                else:
+                    print("Could not find AS for {:}.".format(ip))
+        
+
+    def getedges(self) -> asnutils.EdgeList:
+        """
+            Get a list of edges from the current host object. 
+            Edges are entities made for graphing, and as such contain much less data than the HarHost object
+        """
+        # Start with "localhost"
+        edges = list()
+        
+        
+        for ipkey, ips in self._astrace.items():
+            # ipkey is ip
+            lastNode = ("localhost", EdgeType.start)
+            # annotate for type help
+            current: AS
+            for current in ips:
+                # current is here an AS    
+                country = pycountry.countries.get(alpha_2=current.cc)
+
+                # use lastNode, as well as the current one
+                # current is ASN, lastNode might be "localhost" or ASN
+                # doublecheck that we are not referencing ourselves
+                if lastNode[0] != current.GetPrettyName():
+                    edges.append(EdgeTuple(lastNode[0], 
+                                           current.GetPrettyName(), 
+                                           lastNode[1], EdgeType.asn, 
+                                           lastNode[1], data=self.size))
+                
+                if country is not None: # only add countries which exist
+                    # add country connection as well
+                    edges.append(EdgeTuple(country.name, 
+                                           current.GetPrettyName(), 
+                                           EdgeType.cc, EdgeType.asn, 
+                                           EdgeType.cc, data=current.asn))
+
+                # Handle company if present
+                if current.company is not None:
+                    edges.append(EdgeTuple(current.company, 
+                                           current.GetPrettyName(), 
+                                           EdgeType.company, EdgeType.asn, 
+                                           EdgeType.company))
 
 
-        return asinfo
+                # prepare for next round
+                lastNode = (current.GetPrettyName(), EdgeType.asn)
+            
+            # If we have a full trace its a "host", else its an 
+            # "indirect host" (i.e. ihost)
+            hostedge : EdgeType
+            hostblobb : EdgeType
+
+            if (self._trace == edgeutils.TraceType.full 
+                or self._trace == edgeutils.TraceType.fullbutmid):
+                hostedge = EdgeType.host
+                hostblobb = EdgeType.host
+            else:
+                hostedge = EdgeType.ihost
+                hostblobb = EdgeType.ihost
+
+            # We have added all but lastNode -> final host (IP)
+            edges.append(EdgeTuple(lastNode[0], self._host, 
+                                lastNode[1], hostblobb, hostedge))
+        
+        #import pprint
+        #pprint.pprint(edges)
+
+        # Now we have done all combinations
+        return edges
+
+HostDict = Dict[ipaddress._BaseAddress, HarHost]
 
 class HarResult:
     """ Class for storing data from har request """
@@ -149,7 +297,7 @@ class HarResult:
     def __init__(self, file):
         # Do nothing!
         self._cookies = []
-        self._hosts = []
+        self._hosts = dict()
         # all as with resources
         self._asns = []
         # all as we have traversed
@@ -160,7 +308,6 @@ class HarResult:
         self._hostTraceMap = None
         self._asnTraceMap = dict()
 
-   
     def hasTime(self):
         return self._start != None
 
@@ -181,7 +328,7 @@ class HarResult:
         self._hostTraceMap = value
     
     @property
-    def asnTraceMap(self) -> Dict[str,AsList]:
+    def asnTraceMap(self) -> Dict[str,asnutils.AsList]:
         return self._asnTraceMap
 
     @asnTraceMap.setter
@@ -198,27 +345,27 @@ class HarResult:
         self._cookies = value
 
     @property
-    def hosts(self):
+    def hosts(self) -> Dict[str, HarHost]:
         return self._hosts
 
     @hosts.setter
-    def hosts(self, value):
+    def hosts(self, value : Dict[str, HarHost]):
         self._hosts = value
 
     @property
-    def asns(self) -> AsList:
+    def asns(self) -> asnutils.List:
         return self._asns
 
     @asns.setter
-    def asns(self, value: AsList):
+    def asns(self, value: asnutils.AsList):
         self._asns = value
 
     @property
-    def asnsAll(self) -> AsList:
+    def asnsAll(self) -> asnutils.AsList:
         return self._asnsAll
 
     @asnsAll.setter
-    def asnsAll(self, value: AsList):
+    def asnsAll(self, value: asnutils.AsList):
         self._asnsAll = value
 
     @property
@@ -300,21 +447,22 @@ class Utils:
 class CheckHAR:
     """Class for managing HAR-files"""
 
-
     def __init__(self): #, res: resolver.Resolver):
         # noting
         None
         self.nameip = dict()
         self.ipname = dict()
+        # Lets have a lookup we can share for faster lookups
+        self._asnlookup = asnutils.ASNLookup()
     
-    def GetAsList(self, l : List[str]) -> AsInfo:
+    def GetAsList(self, l : List[str]) -> asnutils.AsInfo:
         #cymruClient = cymruwhois.Client()
         ## lookupmany only takes ip, so we have to convert from asn to ip and back..
         ## enumerate the list, else we get issues "sometimes"
         #ipsasndict = cymruClient.lookupmany_dict(l)
         #asnlist = []
 
-        asnlookup = ASNLookup()
+        asnlookup = asnutils.ASNLookup()
 
         return asnlookup.lookupmany(l)
 
@@ -341,301 +489,88 @@ class CheckHAR:
                 self.result.start = d["log"]["pages"][0]["startedDateTime"]
 
             for entry in d["log"]["entries"]:
+                
                 parsedhost = urlutils.GetHostFromString(entry["request"]["url"])
+                
+                realsize = entry["request"]["headersSize"] + entry["request"]["bodySize"] + entry["response"]["headersSize"] + entry["response"]["bodySize"]
+                if "_transferSize" in entry["response"]:
+                    transfersize = entry["response"]["_transferSize"]
+                else:
+                    transfersize = 0
 
                 for h in parsedhost:
-                    self.result.hosts.append(h)
+                    ## Create a host object matching the host
+                    hh = HarHost(h,transfersize=transfersize, realsize=realsize)
+                    ## lets use our set lookup for speed
+                    hh.setASNLookup(self._asnlookup)
+
+                    ## if we have the host, just update it
+                    ## if we don't, add it
+                    if h in self.result.hosts:
+                        self.result.hosts[h].merge(hh)
+                    else:
+                        self.result.hosts[h] = hh
 
                 # Add all the cookies
                 self.result.cookies.extend(entry["request"]["cookies"])
                 self.result.cookies.extend(entry["response"]["cookies"])
 
-            # magic done with hosts
-            # get unique list, this is done via set
-            self.result.hosts = list(set(self.result.hosts))
-
             print("Parser loaded, {:} hosts in total".format(len(self.result.hosts)))
-            # for entry in self.result.hosts:
-            #    print(entry)    
 
-            locallistips = list()
+    def cook(self):
+            """ Cooks the the Har so we can get the edges. Has to be called prior to getEdges """
+
+            # type hint them, we are reusing them
+            key: str
+            value: HarHost
 
             # go through all the hosts we use, and check paths and asns passed to get there
-            for h in self.result.hosts:
-                try:
-                    ## find both a (ipv4) and aaaa (ipv6) records
-                    dns.resolver
-                    #ips = DNS.dnslookup(h, "a")
-                    ips = (a.address for a in dns.resolver.query(h, "A"))
-                    # IPv6 fails in the tracer. So lets skip it for now
-                    #ips6 = (a.address for a in dns.resolver.query(h, "AAAA"))
-                    #if ips6 is not None:
-                    #    ips.extend(ips6)
+            print("Starting to resolve hosts")
+            for key, value in self.result.hosts.items():
+                value.resolve()
 
-                    for ip in ips:
-                        try:
-                            ## dnspython v2 vs v1.5 has different behaviour here, lets keep backwards comp
+            # Make sure we trace all ips
+            ipstotrace = list()
+            print("Collecting IPs to trace")
+            for key, value in self.result.hosts.items():
+                #self.result.hosts[key].trace()
+                ipstotrace.extend(value.getToTrace())
 
-                            ## ip_inner is thrown and useless, but we need to check if "ip" is an actual ip 
-                            ## in terms of format, and not a host (as the case in a cname -> cname -> a chain)
-                            ip_inner = ipaddress.ip_address(ip)
-                            ## here we know it is an ip
-                            locallistips.append(ip_inner.exploded)
-                            ## cache so we can do a reverse lookup quick
-                            self.ipname[ip_inner.exploded] = h
+            ## Trace all at the same time (due to GIL issues with Python...)
+            print("Starting to trace hosts")
+            traces = TraceManager.TraceAll(set(ipstotrace))
 
-                        except ValueError as e:
-                            ## Probably a host (e.g. xxx.yyy.zzz.akamai.com or so via cname)
-                            print("Not an IP, skipping: {:} ({:})".format(ip, e))
-                        except TypeError as e:
-                            ## Something else is fishy
-                            print("Not an IP, skipping: {:} ({:})".format(ip, e))
-                        except:
-                            print("Unexpected error:", sys.exc_info())
-                   
-                except:
-                    # DNS resolution messed up, such as host cannot be resolved
-                    print("Unexpected error:", sys.exc_info()[0])
-                    print("Unexpected error:", sys.exc_info())
-                    ## put it in the list, that way we still keep it even though we could not resolve it
-                    self.ipname[h] = h
+            print("Adding traces to hosts")
+            for key, value in self.result.hosts.items():
+                value.addTraces(traces)
 
-            # IPs we have found resources at 
-            print("IP-addresses we have found resources at (duplicates removed):")
-            print(set(locallistips))
+            # Now we have all hosts, their traceroutes (hopefully somewhat populated), 
+            # now it is time to resolve their autonomous systems
+            print("Starting to resolve autonomous systems from traces")
+            for key, value in self.result.hosts.items():
+                value.populateAsns()
 
-            ## only host ips
-            r = self.GetAsList(locallistips)
-            self.result.asns = r.asas.values()
+            # HACK Call clean on the ASN lookup
+            self._asnlookup.clean()
 
-            # lets trace them all (requires root)
-            tracedIps = TraceManager.TraceAll(locallistips)
-
-            # traced ips
-            #print(tracedIps)
-
-            # get a dict describing it
-            self.result.hostTraceMap = dict(zip(locallistips, tracedIps))
-
-            # hosttracemap
-            #print(self.result.hostTraceMap)
-
-            # remove the unknown hosts
-            if "*" in self.result.hostTraceMap.keys():
-                del self.result.hostTraceMap["*"]
-
-
-            if len(tracedIps) == 0:
-                raise ValueError("We have ended up with 0(!) hosts, should not happen, check input!")
-
-            # get asns from ips
-            allIps = functools.reduce(list.__add__, tracedIps)
-            ## now we get all ips, store all as and the ipas dict separately
-            r = self.GetAsList(list(set(allIps)))
-            self.result.asnsAll = r.asas.values()
-            self.asndict = r.ipas
-
-            # add a fake localhost in local network
-            self.asndict["localhost"] = AS("local network", "NA", "", "10.0.0.1")
-
-            # get hosts and ips
-            # Gettings asns
-            for tip in self.result.hostTraceMap.keys():
-                filtered = list(filter(lambda x: x != "*",self.result.hostTraceMap[tip]))
-
-                ## hostmap has hosts only
-                ## asnmap has localhost, asns in the middle and hosts at the edges
-                self.result.hostTraceMap[tip] = filtered
-                self.result.asnTraceMap[tip] = list()
-                for item in self.result.hostTraceMap[tip]:
-                    tmpas = self.asndict[item]
-                    if tmpas.name is None:
-                        self.asndict[item].name = "N/A" 
-                        self.asndict[item].asn = item
-
-                    #if self.asndict[item].name == "N/A":
-                    #    print("{:} is not announced by an AS".format(item))
-
-                    self.result.asnTraceMap[tip].append(self.asndict[item])
-                    ## TODO debug info
-                    if item == "localhost":
-                        print("localhost found {:}".format(self.result.hostTraceMap[tip]))
-
-                ## Merge unknown AS into one for better overview
-                last = None
-                tracaslist = list()
-                for item in self.result.asnTraceMap[tip]:
-                    if last == None:
-                        last = item
-                        continue
-
-                    # Check for match, if both N/A we have two unknown in a row, lets merge
-                    if last.name == "N/A" and item.name == "N/A":
-                        # create a new object, so we don't modify other references
-                        newasn = AS(item.name, 1, item.cc, None)
-                        newasn.asn = "{:}, {:}".format(last.asn, item.asn)
-                        newasn.asn = newasn.asn[:30] + (newasn.asn[30:] and '..')
-                        last = newasn
-                        # now we "drop" item by not carrying it over in last
-                    else:
-                        # We append and continue.
-                        tracaslist.append(last)
-                        last = item
-
-                ## add last
-                tracaslist.append(last)
-
-                #Update list    
-                # print("Updating trace map, new:")
-                # for ele in tracaslist:
-                #     print(ele, sep=" -- ", end=" -- ")
-
-                # print("")
-                # print("--- end new --- start Old ---")
-                # for ele in self.result.asnTraceMap[tip]:
-                #     print(ele, sep=" -- ", end=" -- ")
-
-                # print("")
-                # print("--- end old ---")
-
-                self.result.asnTraceMap[tip] = tracaslist
-
-            # filter it so we only have unique values
-            # asns where we fetched resources
-            self.result.asns = self.result.asns
-            # asns included those we were routed through
-            self.result.asnsAll = self.result.asnsAll
-
-            #print ("ASNS: {:} TOTAL ASNS {:}".format(len(self.result.asns), len(self.result.asnsAll)))
-
-    def getEdges(self, dohosts: bool = False, useHostnames: bool = False) -> EdgeList:
-        """
-            Function for getting the edges for drawing a graph out of a HarResult
-        """
-
-        ## local network counter
-        ## we should only get one, keeping as sanity check
-        i = 1
-
-        # make sure we get the right list to start with
-        if dohosts:
-            currentList = self.result.hostTraceMap
-        else:
-            currentList = self.result.asnTraceMap
-
-        # the list of tuples we are going to return
-        listTuples = list()
-
-        ## current list is a dict<ip,list<trace>>
-        for key in currentList.keys():
-            # get the first and make it special
-            current = "localhost"
             
-            for point in currentList[key]:
-                if point == None:
-                    # If we don't have a nice value just continue
-                    continue
-   
-                listTuples.append((current, point))
 
-                current = point
-            
-            #if current != harRes.hostTraceMap[key][-1]:
-                # i.e we are doing asn trace
-                # then we apply the last host manually
-                #listTuples.append((current,harRes.hostTraceMap[key][-1]))
+    def getEdges(self, dohosts: bool = False, useHostnames: bool = False) -> asnutils.EdgeList:
+            """ 
+                Gets all edges in asnutils.EdgeList.
+                Has to be called after 'cook()'
+            """
 
-            if current != key:
-                # the last host didn't respond to ping
-                # so we add it manually
-                listTuples.append((current,key))
+            print("Constructing edges from routing information")
+            # force a set so we dont get duplicates
+            edges = set([edge 
+                        for key in self.result.hosts 
+                        for edge in self.result.hosts[key].getedges()])
 
-        ## Go through and change IPs into hostnames
-        ## lets just cached lookups from previous
-        reverselist = list()
-        for element in listTuples:
-            ## element is a tuple of ips and / or asn.
-            left = element[0]
-            right = element[1]
+            # import pprint
+            # pprint.pprint(edges)
 
-            et = EdgeType.ihost # assume indirect host
-            lefttype = EdgeType.ihost
-            righttype = EdgeType.ihost
-
-            if (isinstance(left, AS) and left.asn == "NA"):
-                ## fix it, its local network
-                print ("local network found: {:}".format(left))
-                left.name = "local network {:}".format(i)
-                i += 1
-                print ("local network found: {:}".format(left))
-
-            if (isinstance(right, AS) and right.asn == "NA"):
-                ## fix it, its local network
-                print ("local network found: {:}".format(right))
-                right.name = "local network {:}".format(i)
-                i += 1
-                print ("local network found: {:}".format(right))
-
-            if isinstance(left, AS) and isinstance(right, AS):
-                # edgetype is between as:es
-                et = EdgeType.asn
-            elif isinstance(left, AS): 
-                # right is host
-                if right in self.asndict.keys() and left.asn == self.asndict[right].asn:
-                    et = EdgeType.host
-                    righttype = EdgeType.host
-                    
-            elif isinstance(right, AS):
-                # left is host
-                if left in self.asndict.keys() and right.asn == self.asndict[left].asn:
-                    et = EdgeType.host
-                    lefttype = EdgeType.host
-                
-            # if we can find, replace, else just put it in again
-
-            if left == "localhost":
-                lefttype = EdgeType.start
-
-            if isinstance(left, AS):
-                ## replace AS with str
-                if (left.cc != ""):
-                    country = pycountry.countries.get(alpha_2=left.cc)
-                    cc = left.cc
-                    if country is not None:
-                        cc = country.name
-
-                    reverselist.append(EdgeTuple(cc, left.GetPrettyName(), EdgeType.cc, EdgeType.asn, edgeType=EdgeType.cc, data=left.asn))
-
-                left = left.GetPrettyName()
-                lefttype = EdgeType.asn
-            elif left in self.ipname and useHostnames:
-                ## convert ip to hostname
-                left = self.ipname[left]
-
-            if isinstance(right, AS):
-                ## replace AS with str
-                if (right.cc != ""):
-                    country = pycountry.countries.get(alpha_2=right.cc)
-                    cc = right.cc
-                    if country is not None:
-                        cc = country.name
-
-                    reverselist.append(EdgeTuple(cc, right.GetPrettyName(), EdgeType.cc, EdgeType.asn, edgeType=EdgeType.cc, data=right.asn))
-
-                right = right.GetPrettyName()
-                righttype = EdgeType.asn
-            elif right in self.ipname and useHostnames:
-                ## convert ip to hostname
-                right = self.ipname[right]
-
-            reverselist.append(EdgeTuple(left,right, lefttype, righttype, edgeType=et))
-
-        ## replace the list with our reverse list
-        listTuples = list(set(reverselist))
-        #listTuples = reverselist
-
-        # return what we have
-        return listTuples
+            return edges
 
     def GetHosts(self):
         return self.result.hosts
@@ -664,4 +599,30 @@ class CheckHAR:
         return self.result
 
 if __name__ == "__main__":
-    print ("Running utilities as main, not really useful")
+    print ("Running utilities as main, using fixed trace list")
+    
+    ## example trace, one local, one well known, and DNs
+    #trace = ("2.18.74.134", ["192.168.0.1", "8.8.8.8", "2.18.74.134"])
+    
+    #hosts = ["www.dn.se", "www.svd.se", "www.happygreen.com"]
+    import pprint
+    
+    hh = HarHost("www.happygreen.com")
+    print("Starting to resolve")
+    hh.resolve()
+    
+    print("Starting to trace")
+    hh.trace()
+    
+    print("Starting to populate asns")
+    hh.populateAsns()
+    
+    pprint.pprint(hh)
+    
+    print("Getting edges")
+    
+    pprint.pprint(hh.getedges())
+    pprint.pprint(hh._ipstrace)
+    pprint.pprint(hh._astrace)
+    
+    

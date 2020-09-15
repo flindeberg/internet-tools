@@ -12,9 +12,12 @@ import matplotlib.cm as cm
 import networkx as nx
 import numpy as np
 
+import asnutils
 import harutilities
 from harutilities import EdgeType
 
+## To rename files / eps / etc
+from pathlib import Path
 
 @dataclass
 class DrawWrapper:
@@ -60,35 +63,44 @@ def get_color(nr: int, all: int):
     res = np.array(cm.autumn(fact))[None, :]
     return res
 
-def draw_graph(graph: harutilities.EdgeList, file: str, graph_layout='spring'):
+def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout='sfdp') -> List[Path]:
 
     # just dump it
     #print(graph)
 
     # create networkx graph
     G=nx.Graph()
+    #G=nx.MultiDiGraph()
 
     # save the nodes for later
     nodes = list()
 
-    nodelist = {EdgeType.asn : list(), EdgeType.cc : list(), EdgeType.host : list(), EdgeType.ihost : list(), EdgeType.start : list()}
+    nodelist = {e : list() for e in EdgeType}
+    #nodelist = {EdgeType.asn : list(), EdgeType.cc : list(), EdgeType.host : list(), EdgeType.ihost : list(), EdgeType.start : list(), EdgeType.company : list()}
 
     # add edges
     for edge in graph:
+        
         ## assume ihost (i.e. indirect host, trace failed)
-        weight = 4
-        length = 4
+        weight = 2
+        length = 2
         if edge.edgeType == EdgeType.cc:
             # lower weight for country codes
-            weight = 2
-            length = 2
+            # should not organize on their behalf
+            weight = 24
+            length = 6
         elif edge.edgeType == EdgeType.asn:
-            weight = 1.5
+            weight = 2
+            length = 5  
         elif edge.edgeType == EdgeType.host:
             weight = 8
+            length = 1.5
+        elif edge.edgeType == EdgeType.company:
+            weight = 20
+            length = 4
 
         # add nodes and edges to graph model
-        G.add_edge(edge.node1, edge.node2, weight=weight, length=length)
+        G.add_edge(edge.node1, edge.node2, weight=weight, length=length, len=length)
         G.add_node(edge.node1)
         G.add_node(edge.node2)
 
@@ -144,12 +156,17 @@ def draw_graph(graph: harutilities.EdgeList, file: str, graph_layout='spring'):
     wrappers[EdgeType.asn] = DrawWrapper(list(set(nodelist[EdgeType.asn])), edges[EdgeType.asn], "ASN", "o", textsize=4, nodesize=300, color="red")
     wrappers[EdgeType.cc] = DrawWrapper(list(set(nodelist[EdgeType.cc])), edges[EdgeType.cc], "Countries", "d", textsize=5, nodesize=400, color="green")
 
+    wrappers[EdgeType.company] = DrawWrapper(list(set(nodelist[EdgeType.company])), edges[EdgeType.company], "Companies", "d", textsize=5, nodesize=400, color="purple")
+
     # All AS same color
     #wrappers["ASNedges"] = DrawWrapper(None, edges[EdgeType.asn], "ASN", "o", textsize=4, nodesize=300, color="red")
 
     # these are different layouts for the network you may try
-    # shell seems to work best
-    if graph_layout == 'spring':
+    # for now defaulting to graphviz
+    if graph_layout == 'sfdp':
+        ## Default to using graphviz, better and faster..
+        graph_pos=nx.drawing.nx_agraph.graphviz_layout(G, prog='neato', root="localhost", args="-Gmaxiter=200")
+    elif graph_layout == 'spring':
         #graph_pos=nx.spring_layout(G, pos={startNode[0]: (0.5,0.5)}, fixed=startNode, iterations=150, scale=1)
         graph_pos=nx.spring_layout(G, iterations=150, scale=1)
     elif graph_layout == 'spectral':
@@ -195,8 +212,26 @@ def draw_graph(graph: harutilities.EdgeList, file: str, graph_layout='spring'):
     plt.axis('off')   
     
     #plt.show()
-    plt.savefig(file, format='png', dpi=1000, pad_inches=0.0)
+    #plt.savefig(file, format='png', dpi=1000, pad_inches=0.3)
+
+    # loop over file endings
+    p = Path(file)
+    # png gives useful bitmap which can be opened everywhere
+    # svg is better
+    types = ["png","svg"]
+    files =[]
+    for t in types:
+        f = p.with_suffix(".{:}".format(t))
+        files.append(f)
+        plt.savefig(f, format=t, dpi=1000, pad_inches=0.3)
+        print("Graph-{:} saved to {:}".format(t,f))
+    
+    #plt.savefig(p.with_suffix(".png"), format='png', dpi=350, pad_inches=0.3)
+    #plt.savefig(p.with_suffix(".svg"), format='svg', dpi=350, pad_inches=0.3)
+    #plt.savefig(p.with_suffix(".eps"), format='eps', dpi=350, pad_inches=0.3)
     plt.gcf().clear()
+    return files
+    
 
 if __name__ == "__main__":
     print("Did you really intend to run this as main?")

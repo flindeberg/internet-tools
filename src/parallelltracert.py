@@ -33,6 +33,7 @@
 # Issue is that the ipv6 packet when read as a buffer does not look as it 
 # does on the wire (i.e. when captured by wireshark), so ICMPv6 packets
 # don't have the required fields available.
+# I do not know why
 
 """
 Core module
@@ -51,8 +52,14 @@ import time
 ## Use threads, not processes (processes are harder to coordinate for small tasks, also larger overhead)
 from multiprocessing.pool import ThreadPool
 
-__all__ = ['MyTracer']
-__tracedebug__ = False
+__all__ = ['ParallellTracer']
+__tracedebug__ = False ## HACK for debug prints
+
+## HACK empirically the cutoff seems to be around 33634
+## standardswise this should not be an issue
+__MAXPORT__ = 33464
+#__MAXPORT__ = 33634
+__MINPORT__ = 33434
 
 def dprint(x):
     """
@@ -75,8 +82,14 @@ class TraceManager(object):
 
     __singleton = None
 
-    ## 200 is arbitrarily chosen, seemed to work well on modern connections (i.e. ballpark gbit). Scale down if needed. 
-    __pool = ThreadPool(200)
+    ## Lets use one per port, works good enough
+    ##__pool = ThreadPool(__MAXPORT__ - __MINPORT__ + 1)
+    __pool : ThreadPool = None 
+
+    @classmethod
+    def SetPorts(cls, ports: int):
+        __MAXPORT__ == __MINPORT__ + ports - 1
+        cls.__pool = ThreadPool(__MAXPORT__ - __MINPORT__ + 1)
 
     @classmethod
     def Instance(cls):
@@ -86,6 +99,7 @@ class TraceManager(object):
 
         if not cls.__singleton:
             cls.__singleton = cls()
+            cls.__pool = ThreadPool(__MAXPORT__ - __MINPORT__ + 1)
 
         cls.__lock.release()
 
@@ -100,18 +114,21 @@ class TraceManager(object):
         
 
     @classmethod
-    def TraceAll(cls, ips: list) -> list:
+    def TraceAll(cls, ips: list) -> dict:
         dprint ("in trace all")
         ins = cls.Instance()
         dprint ("got instance")
-        results = list()
+        results = dict()
 
         for i in ips:
             dprint("(MAIN) Starting {}".format(i))
-            results.append(cls.__pool.apply_async(ins.Trace,  (i,)))
+            results[i] = cls.__pool.apply_async(ins.Trace,  (i,))
+            #results.append(cls.__pool.apply_async(ins.Trace,  (i,)))
 
         dprint("(MAIN) Waiting for results")
-        results = list([r.get() for r in results])
+        #results = list([r.get() for r in results])
+        for key in ips:
+            results[key] = results[key].get()
         dprint("(MAIN) Results fetched")
 
         print("(MAIN) We have traced {:} and have {:} tracing.".format(len(ins.__traced.keys()),len(ins.__tracing)))
@@ -161,13 +178,16 @@ class TraceManager(object):
 
         self.__sema.release()
 
-        form = "Traced {:} ({:}/{:}, {:}%, {:} ongoing)"
+        form = "Traced {:} ({:}/{:}, {:}%, {:} ongoing), ports {:}-{:}"
         print (form.format(
             local_ip, 
             len(self.__traced.keys()), 
             (len(self.__tracing) + len(self.__traced.keys())),
-            round(100 * (len(self.__traced.keys())) / (len(self.__tracing) + len(self.__traced.keys())),2),
-            len(self.__tracing)
+            round(100 * (len(self.__traced.keys())) / 
+                        (len(self.__tracing) + len(self.__traced.keys())),2),
+            len(self.__tracing),
+            __MINPORT__,
+            __MAXPORT__
         ))
 
         return res
@@ -226,8 +246,9 @@ class MyTracer(object):
         # Loop for starting the listener
         with MyTracer.lock:
             if not MyTracer.listening:
-                # important to use a THREADpool, and not a pool which is processes
-                # we don't want processes, period. Processes in Python are weird. 
+                # important to use a THREADpool, and not a pool which is 
+                # processes we don't want processes, period. Processes in 
+                # Python are weird. 
                 pool = ThreadPool(1)
                 # start it
                 pool.apply_async(MyTracer.listen)
@@ -239,10 +260,15 @@ class MyTracer(object):
         while True:
             with MyTracer.lock:
                 # Pick up a random port in the range 33434-33534
-                self.port = random.choice(range(33434, 33464))
+                #self.port = random.choice(range(33434, 33464))
+                self.port = random.choice(range(__MINPORT__, __MAXPORT__))
+                
                 if self.port not in MyTracer.ports:
                     MyTracer.ports.add(self.port)
                     return
+            
+            # Sleep to avoid cpu thrashing
+            time.sleep(0.01)
 
     @classmethod
     def listen(cls):
@@ -263,13 +289,15 @@ class MyTracer(object):
                 addr = None
 
                 # Get the sema, then try to recieve
-                # Ergo we wait here untill a sending thread signals that we should wait for something
+                # Ergo we wait here untill a sending thread signals that we 
+                # should wait for something
                 cls.recieveSema.acquire()
 
                 try:
                     # Read from socket. Will timeout based on socket settings.
                     # Timeout will raise socket.error
-                    # We don't care about big packets. They are prolly not coming from us anyhow
+                    # We don't care about big packets. They are prolly not 
+                    # coming from us anyhow
                     data, addr = r4.recvfrom(1024)
                     
                     # Check that it is an ICMP package and its a 3 / 3 or 11 / 0
@@ -290,11 +318,14 @@ class MyTracer(object):
                         # Not ICMP, don't really know what to do here, skip it?
                         # lets skip it
                         continue
-                    elif not (data[20] == 11 and data[21] == 0) \
-                        and not (data[20] == 3 and data[21] == 0) \
-                        and not (data[20] == 3 and data[21] == 3) \
-                        and not (data[20] == 3 and data[21] == 10) \
-                        and not (data[20] == 3 and data[21] == 13):
+                    elif (not (data[20] == 11 and data[21] == 0) 
+                        and not (data[20] == 11 and data[21] == 3) 
+                        and not (data[20] == 11 and data[21] == 10) 
+                        and not (data[20] == 11 and data[21] == 13) 
+                        and not (data[20] == 3 and data[21] == 0) 
+                        and not (data[20] == 3 and data[21] == 3) 
+                        and not (data[20] == 3 and data[21] == 10) 
+                        and not (data[20] == 3 and data[21] == 13)):
                         # ICMP which is not 3/3-10-13 or 11/0
                         continue
 
@@ -395,6 +426,9 @@ class MyTracer(object):
         except KeyError as ke:
             # probably due to accessing wrong key in the dict
             print ("listener got KeyError: {:}".format(ke))
+        except PermissionError as pe:
+            print ("Permission error, we cannot trace, re raising")
+            raise pe
         except:
             # should not happen any more
             print ("Unexpected error in listener: {:}".format(sys.exc_info()[0]))
@@ -431,12 +465,13 @@ class MyTracer(object):
                 raise IOError('Unable to resolve {}: {}', self.dst, e)
 
         # print something to output if we want to
-        text = 'traceroute to {} ({}), {} hops max'.format(
-            self.dst,
-            dst_ip.exploded,
-            self.hops
-        )
         if not self.quiet:
+            # print something to output if we want to
+            text = 'traceroute to {} ({}), {} hops max'.format(
+                self.dst,
+                dst_ip.exploded,
+                self.hops
+            )
             print(text)
 
         # creaty the query object we will but in the running queries
