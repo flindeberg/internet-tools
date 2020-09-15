@@ -38,4 +38,4 @@ jobs:
     - name: Test simple pages
       run: |
         cd src
-        ./generatemap.py -w www.dn.se www.svd.se -o newssites
+        python generatemap.py -w www.dn.se www.svd.se -o newssites
