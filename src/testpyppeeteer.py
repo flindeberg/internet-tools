@@ -7,7 +7,7 @@ import pprint
 
 async def main():
     browser = await launch(headless=True)
-    page1 = await browser.newPage()
+    #page1 = await browser.newPage()
     
     context = await browser.createIncognitoBrowserContext()
     

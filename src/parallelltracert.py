@@ -343,7 +343,7 @@ class MyTracer(object):
                     # get the host from addr (i.e. addr[0], addr[1] is port which is 0 for ICMP)
                     addr = addr[0]
 
-                except socket.error as e:
+                except socket.error:
                     ### We should try IPv6, but it doesn't work!
                     ### IPv6 disabled at send for now
                     try:
@@ -455,7 +455,7 @@ class MyTracer(object):
             # start with checking if we have an ip (works with ipv4 and ipv6)
             ip_inner = ipaddress.ip_address(self.dst)
             dst_ip = ip_inner
-        except Exception as e:
+        except Exception:
             # resolve hostname to IP
             # does not handle ipv6 (socket.gethostbyname)
             try:

@@ -4,20 +4,16 @@ from __future__ import annotations
 # Copyright (c) 2019, 2020 Fredrik Lindeberg <flindeberg@gmail.com>
 # All rights reserved.
 
-import functools
 import ipaddress
 import json
 import os
 import re
 import sys
-from dataclasses import dataclass
-from enum import Enum
 from subprocess import call
-from typing import Dict, List, NamedTuple, Tuple
+from typing import Dict, List
 from urllib.parse import urlparse
 
 import dns.resolver
-import pyasn
 import pycountry
 
 ## local imports

@@ -4,8 +4,6 @@ from typing import Dict, List, NamedTuple
 from dataclasses import dataclass
 import pyasn
 import pycountry
-import urllib.request
-from urllib.parse import urlparse
 import json
 
 import edgeutils
@@ -15,8 +13,7 @@ import cleanco
 
 # match company names
 import pandas as pd
-import numpy as np
-from string_grouper import match_strings, match_most_similar, group_similar_strings, StringGrouper
+from string_grouper import match_most_similar
 
 
 ## TLS adapted for workaround
