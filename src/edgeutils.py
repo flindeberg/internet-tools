@@ -14,6 +14,9 @@ class TraceType(Enum):
         if "*" not in trace:
             # No stars, it is a full trace
             return TraceType.full
+        elif all(item == "*" for item in trace):
+            # fail fast, all stars
+            return TraceType.missing
         elif trace[-1] != "*":
             # We have the end, so we are missing mid
             return TraceType.fullbutmid
