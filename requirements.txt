@@ -1,0 +1,14 @@
+## Packages needed, maybe add versions?
+networkx
+matplotlib
+splinter
+bs4
+pyasn
+dnspython
+pycountry
+elevate
+pandas
+cleanco
+string_grouper
+pygraphviz
+requests
