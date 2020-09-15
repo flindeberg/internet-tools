@@ -8,7 +8,6 @@ import os
 import subprocess
 import sys
 import tempfile
-from itertools import chain
 from pathlib import Path
 from shutil import copyfile
 
@@ -24,13 +23,14 @@ from urllib.parse import urlparse
 
 
 """
- Module for generating graphs of website dependencies. Useful for illustrating the complexity of the Internet by showing how the web# uses the Internet.
+ Module for generating graphs of website dependencies. Useful for illustrating
+ the complexity of the Internet by showing how the web# uses the Internet.
 """
 
 
 def main(arg=None):
 
-    ## no args, lets fetch from commandline
+    # no args, lets fetch from commandline
     parser = argparse.ArgumentParser(
             description="Draw tracemaps based on a set of hosts")
 
