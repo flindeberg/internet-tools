@@ -10,13 +10,16 @@ from functools import wraps
 
 
 DEFAULT_NGRAM_SIZE: int = 3
-DEFAULT_REGEX: str = r'[,-./]|\s'
+DEFAULT_REGEX: str = r"[,-./]|\s"
 DEFAULT_MAX_N_MATCHES: int = 20
-DEFAULT_MIN_SIMILARITY: float = 0.8  # Minimum cosine similarity for an item to be considered a match
+DEFAULT_MIN_SIMILARITY: float = (
+    0.8  # Minimum cosine similarity for an item to be considered a match
+)
 DEFAULT_N_PROCESSES: int = multiprocessing.cpu_count() - 1
-DEFAULT_IGNORE_CASE: bool = True # ignores case by default
+DEFAULT_IGNORE_CASE: bool = True  # ignores case by default
 
 # High level functions
+
 
 def group_similar_strings(strings_to_group: pd.Series, **kwargs) -> pd.Series:
     """
@@ -54,7 +57,9 @@ def match_most_similar(master: pd.Series, duplicates: pd.Series, **kwargs) -> pd
     return string_grouper.get_groups()
 
 
-def match_strings(master: pd.Series, duplicates: Optional[pd.Series] = None, **kwargs) -> pd.DataFrame:
+def match_strings(
+    master: pd.Series, duplicates: Optional[pd.Series] = None, **kwargs
+) -> pd.DataFrame:
     """
     Returns all highly similar strings. If only 'master' is given, it will return highly similar strings within master.
     This can be seen as an self-join. If both master and duplicates is given, it will return highly similar strings
@@ -93,24 +98,31 @@ class StringGrouperConfig(NamedTuple):
 
 def validate_is_fit(f):
     """Validates if the StringBuilder was fit before calling certain public functions"""
+
     @wraps(f)
     def wrapper(*args, **kwargs):
         if args[0].is_build:
             return f(*args, **kwargs)
         else:
-            raise StringGrouperNotFitException(f'{f.__name__} was called before the "fit" function was called.'
-                                               f' Make sure to run fit the StringGrouper first using '
-                                               f'StringGrouper.fit()')
+            raise StringGrouperNotFitException(
+                f'{f.__name__} was called before the "fit" function was called.'
+                f" Make sure to run fit the StringGrouper first using "
+                f"StringGrouper.fit()"
+            )
+
     return wrapper
 
 
 class StringGrouperNotFitException(Exception):
     """Raised when one of the public functions is called which requires the StringGrouper to be fit first"""
+
     pass
 
 
 class StringGrouper(object):
-    def __init__(self, master: pd.Series, duplicates: Optional[pd.Series] = None, **kwargs):
+    def __init__(
+        self, master: pd.Series, duplicates: Optional[pd.Series] = None, **kwargs
+    ):
         """
         StringGrouper is a class that holds the matrix with cosine similarities between the master and duplicates
         matrix. If duplicates is not given it is replaced by master. To build this matrix the `fit` function must be
@@ -122,13 +134,19 @@ class StringGrouper(object):
         :param kwargs: All other keyword arguments are passed to StringGrouperConfig
         """
         # Validate input
-        if not StringGrouper._is_series_of_strings(master) or \
-                (duplicates is not None and not StringGrouper._is_series_of_strings(duplicates)):
-            raise TypeError('Input does not consist of pandas.Series containing only Strings')
+        if not StringGrouper._is_series_of_strings(master) or (
+            duplicates is not None
+            and not StringGrouper._is_series_of_strings(duplicates)
+        ):
+            raise TypeError(
+                "Input does not consist of pandas.Series containing only Strings"
+            )
 
         self._config: StringGrouperConfig = StringGrouperConfig(**kwargs)
         self._master: pd.Series = master.reset_index(drop=True)
-        self._duplicates: pd.Series = duplicates.reset_index(drop=True) if duplicates is not None else None
+        self._duplicates: pd.Series = (
+            duplicates.reset_index(drop=True) if duplicates is not None else None
+        )
         self.is_build = False  # indicates if the grouper was fit or not
         self._vectorizer = TfidfVectorizer(min_df=1, analyzer=self.n_grams)
         # After the StringGrouper is build, _matches_list will contain the indices and similarities of two matches
@@ -141,13 +159,13 @@ class StringGrouper(object):
         """
         ngram_size = self._config.ngram_size
         regex_pattern = self._config.regex
-        if (self._config.ignore_case and string is not None):
-            string = string.lower() # lowercase to ignore all case
-        string = re.sub(regex_pattern, r'', string)
+        if self._config.ignore_case and string is not None:
+            string = string.lower()  # lowercase to ignore all case
+        string = re.sub(regex_pattern, r"", string)
         n_grams = zip(*[string[i:] for i in range(ngram_size)])
-        return [''.join(n_gram) for n_gram in n_grams]
+        return ["".join(n_gram) for n_gram in n_grams]
 
-    def fit(self) -> 'StringGrouper':
+    def fit(self) -> "StringGrouper":
         """Builds the _matches list which contains string matches indices and similarity"""
         master_matrix, duplicate_matrix = self._get_tf_idf_matrices()
         # Calculate the matches using the cosine similarity
@@ -163,38 +181,42 @@ class StringGrouper(object):
         left_side = self._master[self._matches_list.master_side].reset_index(drop=True)
 
         if self._duplicates is not None:
-            right_side = self._duplicates[self._matches_list.dupe_side].reset_index(drop=True)
+            right_side = self._duplicates[self._matches_list.dupe_side].reset_index(
+                drop=True
+            )
         else:
-            right_side = self._master[self._matches_list.dupe_side].reset_index(drop=True)
+            right_side = self._master[self._matches_list.dupe_side].reset_index(
+                drop=True
+            )
 
         similarity = self._matches_list.similarity.reset_index(drop=True)
-        return pd.DataFrame({
-            'left_side': left_side,
-            'right_side': right_side,
-            'similarity': similarity
-        })
+        return pd.DataFrame(
+            {"left_side": left_side, "right_side": right_side, "similarity": similarity}
+        )
 
     @validate_is_fit
     def get_groups(self) -> pd.Series:
         """If there is only a master series of strings, this will return the 'master' strings.
-         A single string in a group of near duplicates is chosen for as 'master' and is returned for each string
-         in the master series.
-         If there is a master series and a duplicate series, the most similar master is picked
-         for each duplicate and returned
-         """
+        A single string in a group of near duplicates is chosen for as 'master' and is returned for each string
+        in the master series.
+        If there is a master series and a duplicate series, the most similar master is picked
+        for each duplicate and returned
+        """
         if self._duplicates is None:
             return self._deduplicate()
         else:
             return self._get_nearest_matches()
 
     @validate_is_fit
-    def add_match(self, master_side: str, dupe_side: str) -> 'StringGrouper':
+    def add_match(self, master_side: str, dupe_side: str) -> "StringGrouper":
         """Adds a match if it wasn't found by the fit function"""
         master_indices, dupe_indices = self._get_indices_of(master_side, dupe_side)
         similarities = [1]
 
         # cross join the indices
-        new_matches = StringGrouper._cross_join(dupe_indices, master_indices, similarities)
+        new_matches = StringGrouper._cross_join(
+            dupe_indices, master_indices, similarities
+        )
         # If we are deduping within one Series, we need to make sure the matches stay symmetric
         if self._duplicates is None:
             new_matches = StringGrouper._make_symmetric(new_matches)
@@ -203,7 +225,7 @@ class StringGrouper(object):
         return self
 
     @validate_is_fit
-    def remove_match(self, master_side: str, dupe_side: str) -> 'StringGrouper':
+    def remove_match(self, master_side: str, dupe_side: str) -> "StringGrouper":
         """ Removes a match from the StringGrouper"""
         master_indices, dupe_indices = self._get_indices_of(master_side, dupe_side)
         # In the case of having only a master series, we need to remove both the master - dupe match
@@ -214,9 +236,10 @@ class StringGrouper(object):
 
         self._matches_list = self._matches_list[
             ~(
-                    (self._matches_list.master_side.isin(master_indices)) &
-                    (self._matches_list.dupe_side.isin(dupe_indices))
-            )]
+                (self._matches_list.master_side.isin(master_indices))
+                & (self._matches_list.dupe_side.isin(dupe_indices))
+            )
+        ]
         return self
 
     def _get_tf_idf_matrices(self) -> Tuple[csr_matrix, csr_matrix]:
@@ -243,7 +266,9 @@ class StringGrouper(object):
         self._vectorizer.fit(strings)
         return self._vectorizer
 
-    def _build_matches(self, master_matrix: csr_matrix, duplicate_matrix: csr_matrix) -> csr_matrix:
+    def _build_matches(
+        self, master_matrix: csr_matrix, duplicate_matrix: csr_matrix
+    ) -> csr_matrix:
         """Builds the cossine similarity matrix of two csr matrices"""
         tf_idf_matrix_1 = master_matrix
         tf_idf_matrix_2 = duplicate_matrix.transpose()
@@ -251,14 +276,17 @@ class StringGrouper(object):
         optional_kwargs = dict()
         if self._config.number_of_processes > 1:
             optional_kwargs = {
-                'use_threads': True,
-                'n_jobs': self._config.number_of_processes
+                "use_threads": True,
+                "n_jobs": self._config.number_of_processes,
             }
 
-        return awesome_cossim_topn(tf_idf_matrix_1, tf_idf_matrix_2,
-                                   self._config.max_n_matches,
-                                   self._config.min_similarity,
-                                   **optional_kwargs)
+        return awesome_cossim_topn(
+            tf_idf_matrix_1,
+            tf_idf_matrix_2,
+            self._config.max_n_matches,
+            self._config.min_similarity,
+            **optional_kwargs,
+        )
 
     @staticmethod
     def _get_matches_list(matches) -> pd.DataFrame:
@@ -277,33 +305,44 @@ class StringGrouper(object):
             dupe_side[index] = sparsecols[index]
             similarity[index] = matches.data[index]
 
-        matches_list = pd.DataFrame({'master_side': master_side,
-                                     'dupe_side': dupe_side,
-                                     'similarity': similarity})
+        matches_list = pd.DataFrame(
+            {
+                "master_side": master_side,
+                "dupe_side": dupe_side,
+                "similarity": similarity,
+            }
+        )
         return matches_list
 
     @staticmethod
     def _clean_groups(grouped_id_tuples: pd.DataFrame) -> pd.DataFrame:
         """Clean groups by merging groups that have an item in between them with a high similarity"""
         # Find the groups where the min id is not equal to the group id
-        id_tuples_min = grouped_id_tuples.groupby('group_id').agg('min').reset_index()
-        orphans = id_tuples_min[id_tuples_min.group_id != id_tuples_min.original_id].copy()
+        id_tuples_min = grouped_id_tuples.groupby("group_id").agg("min").reset_index()
+        orphans = id_tuples_min[
+            id_tuples_min.group_id != id_tuples_min.original_id
+        ].copy()
         if orphans.shape[0] > 0:
             # Get the new group id's
-            new_group_id = (orphans
-                            .merge(grouped_id_tuples,
-                                   left_on='group_id', right_on='original_id', suffixes=('_orig', '_new'))
-                            [['group_id_orig', 'group_id_new']]
-                            .drop_duplicates())
+            new_group_id = orphans.merge(
+                grouped_id_tuples,
+                left_on="group_id",
+                right_on="original_id",
+                suffixes=("_orig", "_new"),
+            )[["group_id_orig", "group_id_new"]].drop_duplicates()
             # join them with the old group ids
-            new_grouped_id_tuples = grouped_id_tuples.merge(new_group_id,
-                                                            how='outer',
-                                                            left_on='group_id', right_on='group_id_orig')
+            new_grouped_id_tuples = grouped_id_tuples.merge(
+                new_group_id, how="outer", left_on="group_id", right_on="group_id_orig"
+            )
             # update the old ones
             rows_to_update = ~new_grouped_id_tuples.group_id_new.isnull()
-            new_grouped_id_tuples.loc[rows_to_update, 'group_id'] = new_grouped_id_tuples[rows_to_update].group_id_new
-            grouped_id_tuples = new_grouped_id_tuples[['original_id', 'group_id', 'min_similarity']].copy()
-            grouped_id_tuples.group_id = grouped_id_tuples.group_id.astype('int64')
+            new_grouped_id_tuples.loc[
+                rows_to_update, "group_id"
+            ] = new_grouped_id_tuples[rows_to_update].group_id_new
+            grouped_id_tuples = new_grouped_id_tuples[
+                ["original_id", "group_id", "min_similarity"]
+            ].copy()
+            grouped_id_tuples.group_id = grouped_id_tuples.group_id.astype("int64")
             # repeat if necessary
             return StringGrouper._clean_groups(grouped_id_tuples)
         else:
@@ -311,80 +350,120 @@ class StringGrouper(object):
 
     def _get_nearest_matches(self) -> pd.Series:
 
-        dupes = self._duplicates.rename('duplicates')
-        master = self._master.rename('master')
+        dupes = self._duplicates.rename("duplicates")
+        master = self._master.rename("master")
 
-        dupes_max_sim = self._matches_list.groupby('dupe_side').agg({'similarity': 'max'}).reset_index()
-        dupes_max_sim = dupes_max_sim.merge(self._matches_list, on=['dupe_side', 'similarity'])
+        dupes_max_sim = (
+            self._matches_list.groupby("dupe_side")
+            .agg({"similarity": "max"})
+            .reset_index()
+        )
+        dupes_max_sim = dupes_max_sim.merge(
+            self._matches_list, on=["dupe_side", "similarity"]
+        )
 
         # in case there are multiple equal similarities, we pick the one that comes first
-        dupes_max_sim = dupes_max_sim.groupby(['dupe_side']).agg({'master_side': 'min'}).reset_index()
+        dupes_max_sim = (
+            dupes_max_sim.groupby(["dupe_side"])
+            .agg({"master_side": "min"})
+            .reset_index()
+        )
 
         # First we add the duplicate strings
-        dupes_max_sim = dupes_max_sim.merge(dupes, left_on='dupe_side', right_index=True, how='outer')
+        dupes_max_sim = dupes_max_sim.merge(
+            dupes, left_on="dupe_side", right_index=True, how="outer"
+        )
 
         # Now add the master strings
-        dupes_max_sim = dupes_max_sim.merge(master, left_on='master_side', right_index=True, how='left')
+        dupes_max_sim = dupes_max_sim.merge(
+            master, left_on="master_side", right_index=True, how="left"
+        )
 
         # update the master series with the duplicates in cases were there is no match
         rows_to_update = dupes_max_sim.master.isnull()
-        dupes_max_sim.loc[rows_to_update, 'master'] = dupes_max_sim[rows_to_update].duplicates
+        dupes_max_sim.loc[rows_to_update, "master"] = dupes_max_sim[
+            rows_to_update
+        ].duplicates
         # make sure to keep same order as duplicates
-        dupes_max_sim = dupes_max_sim.sort_values('dupe_side').set_index('dupe_side')
+        dupes_max_sim = dupes_max_sim.sort_values("dupe_side").set_index("dupe_side")
         dupes_max_sim.index.rename(None, inplace=True)
-        return dupes_max_sim['master'].rename(None)
+        return dupes_max_sim["master"].rename(None)
 
     def _deduplicate(self) -> pd.Series:
         master_indices = self._master.index.to_series()
-        index_to_index = pd.DataFrame({
-            'master_side': master_indices,
-            'dupe_side': master_indices,
-            'similarity': np.full(master_indices.shape[0], 1)
-        })
+        index_to_index = pd.DataFrame(
+            {
+                "master_side": master_indices,
+                "dupe_side": master_indices,
+                "similarity": np.full(master_indices.shape[0], 1),
+            }
+        )
         all_id_tuples = pd.concat([self._matches_list, index_to_index])
 
         # get the groups
-        grouped_id_tuples = all_id_tuples.groupby('dupe_side').agg('min').reset_index()
-        grouped_id_tuples.columns = ['original_id', 'group_id', 'min_similarity']
+        grouped_id_tuples = all_id_tuples.groupby("dupe_side").agg("min").reset_index()
+        grouped_id_tuples.columns = ["original_id", "group_id", "min_similarity"]
 
         # clean the groups:
         grouped_id_tuples = StringGrouper._clean_groups(grouped_id_tuples)
-        grouped_id_tuples = grouped_id_tuples.sort_values(by='original_id')
+        grouped_id_tuples = grouped_id_tuples.sort_values(by="original_id")
 
         # Get the strings belonging to the group ids
-        group_id_strings = self._master[grouped_id_tuples.group_id].reset_index(drop=True)
+        group_id_strings = self._master[grouped_id_tuples.group_id].reset_index(
+            drop=True
+        )
         return group_id_strings
 
-    def _get_indices_of(self, master_side: str, dupe_side: str) -> Tuple[pd.Series, pd.Series]:
+    def _get_indices_of(
+        self, master_side: str, dupe_side: str
+    ) -> Tuple[pd.Series, pd.Series]:
         master_strings = self._master
         dupe_strings = self._master if self._duplicates is None else self._duplicates
         # Check if input is valid:
-        self._validate_strings_exist(master_side, dupe_side, master_strings, dupe_strings)
+        self._validate_strings_exist(
+            master_side, dupe_side, master_strings, dupe_strings
+        )
         # Get the indices of the two strings
-        master_indices = master_strings[master_strings == master_side].index.to_series().reset_index(drop=True)
-        dupe_indices = dupe_strings[dupe_strings == dupe_side].index.to_series().reset_index(drop=True)
+        master_indices = (
+            master_strings[master_strings == master_side]
+            .index.to_series()
+            .reset_index(drop=True)
+        )
+        dupe_indices = (
+            dupe_strings[dupe_strings == dupe_side]
+            .index.to_series()
+            .reset_index(drop=True)
+        )
         return master_indices, dupe_indices
 
     @staticmethod
     def _make_symmetric(new_matches: pd.DataFrame) -> pd.DataFrame:
-        columns_switched = pd.DataFrame({'master_side': new_matches.dupe_side,
-                                         'dupe_side': new_matches.master_side,
-                                         'similarity': new_matches.similarity})
+        columns_switched = pd.DataFrame(
+            {
+                "master_side": new_matches.dupe_side,
+                "dupe_side": new_matches.master_side,
+                "similarity": new_matches.similarity,
+            }
+        )
         return pd.concat([new_matches, columns_switched])
 
     @staticmethod
     def _cross_join(dupe_indices, master_indices, similarities) -> pd.DataFrame:
-        x_join_index = pd.MultiIndex.from_product([master_indices, dupe_indices, similarities],
-                                                  names=['master_side', 'dupe_side', 'similarity'])
+        x_join_index = pd.MultiIndex.from_product(
+            [master_indices, dupe_indices, similarities],
+            names=["master_side", "dupe_side", "similarity"],
+        )
         x_joined_df = pd.DataFrame(index=x_join_index).reset_index()
         return x_joined_df
 
     @staticmethod
     def _validate_strings_exist(master_side, dupe_side, master_strings, dupe_strings):
         if not master_strings.isin([master_side]).any():
-            raise ValueError(f'{master_side} not found in StringGrouper string series')
+            raise ValueError(f"{master_side} not found in StringGrouper string series")
         elif not dupe_strings.isin([dupe_side]).any():
-            raise ValueError(f'{dupe_side} not found in StringGrouper dupe string series')
+            raise ValueError(
+                f"{dupe_side} not found in StringGrouper dupe string series"
+            )
 
     @staticmethod
     def _is_series_of_strings(series_to_test: pd.Series) -> bool:

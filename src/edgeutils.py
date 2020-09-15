@@ -1,12 +1,12 @@
 from enum import Enum
 from dataclasses import dataclass
 
-class TraceType(Enum):
-    full = 0 # a full and complete trace
-    fullbutend = 1 # all missing hosts are at the end
-    fullbutmid = 2 # all missing hosts are in the middle
-    missing = 3 # some other form
 
+class TraceType(Enum):
+    full = 0  # a full and complete trace
+    fullbutend = 1  # all missing hosts are at the end
+    fullbutmid = 2  # all missing hosts are in the middle
+    missing = 3  # some other form
 
     @classmethod
     def getTraceStatus(cls, trace: list):
@@ -29,6 +29,7 @@ class TraceType(Enum):
             # now we have removed the end *:s, lets see if we still have any
             return TraceType.fullbutend if "*" not in rev else TraceType.missing
 
+
 class EdgeType(Enum):
     start = 0
     ihost = 1
@@ -36,6 +37,7 @@ class EdgeType(Enum):
     asn = 3
     cc = 4
     company = 5
+
 
 @dataclass
 class EdgeTuple:
@@ -53,4 +55,3 @@ class EdgeTuple:
 
     def __eq__(self, x):
         return self.__hash__() == x.__hash__()
-

@@ -29,8 +29,8 @@
 # https://github.com/flindeberg/internet-tools
 
 # TODO ipv6
-# ipv6 does not work, feel free to fix it. 
-# Issue is that the ipv6 packet when read as a buffer does not look as it 
+# ipv6 does not work, feel free to fix it.
+# Issue is that the ipv6 packet when read as a buffer does not look as it
 # does on the wire (i.e. when captured by wireshark), so ICMPv6 packets
 # don't have the required fields available.
 # I do not know why
@@ -49,17 +49,19 @@ import struct
 import sys
 import threading
 import time
+
 ## Use threads, not processes (processes are harder to coordinate for small tasks, also larger overhead)
 from multiprocessing.pool import ThreadPool
 
-__all__ = ['TraceManager']
-__tracedebug__ = False ## HACK for debug prints
+__all__ = ["TraceManager"]
+__tracedebug__ = False  ## HACK for debug prints
 
 ## HACK empirically the cutoff seems to be around 33634
 ## standardswise this should not be an issue
 __MAXPORT__ = 33464
-#__MAXPORT__ = 33634
+# __MAXPORT__ = 33634
 __MINPORT__ = 33434
+
 
 def dprint(x):
     """
@@ -68,6 +70,7 @@ def dprint(x):
     """
     if __tracedebug__:
         print(x)
+
 
 ## Class for "singletoning" the traces, often quite useful
 class TraceManager(object):
@@ -84,7 +87,7 @@ class TraceManager(object):
 
     ## Lets use one per port, works good enough
     ##__pool = ThreadPool(__MAXPORT__ - __MINPORT__ + 1)
-    __pool : ThreadPool = None 
+    __pool: ThreadPool = None
 
     @classmethod
     def SetPorts(cls, ports: int):
@@ -107,35 +110,38 @@ class TraceManager(object):
 
     def __init__(self):
         if os.name == "nt":
-            # TODO Add support for Windows? 
-            raise Exception('Currently the implementation does not support Windows.')
+            # TODO Add support for Windows?
+            raise Exception("Currently the implementation does not support Windows.")
 
         self.__sema = threading.RLock()
-        
 
     @classmethod
     def TraceAll(cls, ips: list) -> dict:
-        dprint ("in trace all")
+        dprint("in trace all")
         ins = cls.Instance()
-        dprint ("got instance")
+        dprint("got instance")
         results = dict()
 
         for i in ips:
             dprint("(MAIN) Starting {}".format(i))
-            results[i] = cls.__pool.apply_async(ins.Trace,  (i,))
-            #results.append(cls.__pool.apply_async(ins.Trace,  (i,)))
+            results[i] = cls.__pool.apply_async(ins.Trace, (i,))
+            # results.append(cls.__pool.apply_async(ins.Trace,  (i,)))
 
         dprint("(MAIN) Waiting for results")
-        #results = list([r.get() for r in results])
+        # results = list([r.get() for r in results])
         for key in ips:
             results[key] = results[key].get()
         dprint("(MAIN) Results fetched")
 
-        print("(MAIN) We have traced {:} and have {:} tracing.".format(len(ins.__traced.keys()),len(ins.__tracing)))
+        print(
+            "(MAIN) We have traced {:} and have {:} tracing.".format(
+                len(ins.__traced.keys()), len(ins.__tracing)
+            )
+        )
 
         return results
 
-    #@classmethod
+    # @classmethod
     def Trace(self, ip: str):
         res = None
         local_ip = ip
@@ -144,7 +150,16 @@ class TraceManager(object):
         self.__sema.acquire()
 
         form = "Currently there are {:} traced and {:} tracing ({:}:{:}:{:}). Going for {:}"
-        dprint (form.format(len(self.__traced.keys()), len(self.__tracing), self.__d_noLookup, self.__d_Lookup, self.__d_tracing, local_ip))
+        dprint(
+            form.format(
+                len(self.__traced.keys()),
+                len(self.__tracing),
+                self.__d_noLookup,
+                self.__d_Lookup,
+                self.__d_tracing,
+                local_ip,
+            )
+        )
 
         if local_ip in self.__traced.keys():
             # Its already traces, lets assume its correct
@@ -153,7 +168,7 @@ class TraceManager(object):
         elif local_ip in self.__tracing:
             # Its currently being traced
             self.__sema.release()
-            dprint ("Waiting for {:}".format(local_ip))
+            dprint("Waiting for {:}".format(local_ip))
             # We can wait here a bit, noone will die
             # remember that we are waiting for a network, i.e. slow.
             time.sleep(0.5)
@@ -179,21 +194,27 @@ class TraceManager(object):
         self.__sema.release()
 
         form = "Traced {:} ({:}/{:}, {:}%, {:} ongoing), ports {:}-{:}"
-        print (form.format(
-            local_ip, 
-            len(self.__traced.keys()), 
-            (len(self.__tracing) + len(self.__traced.keys())),
-            round(100 * (len(self.__traced.keys())) / 
-                        (len(self.__tracing) + len(self.__traced.keys())),2),
-            len(self.__tracing),
-            __MINPORT__,
-            __MAXPORT__
-        ))
+        print(
+            form.format(
+                local_ip,
+                len(self.__traced.keys()),
+                (len(self.__tracing) + len(self.__traced.keys())),
+                round(
+                    100
+                    * (len(self.__traced.keys()))
+                    / (len(self.__tracing) + len(self.__traced.keys())),
+                    2,
+                ),
+                len(self.__tracing),
+                __MINPORT__,
+                __MAXPORT__,
+            )
+        )
 
         return res
-            
+
+
 class Query(object):
-    
     def __init__(self, port):
         self.port = port
         self.hops = list()
@@ -202,11 +223,12 @@ class Query(object):
         self.startTimer = None
         self.lock = threading.Lock()
 
-class Hop(object):
 
+class Hop(object):
     def __init__(self, addr, rtt):
         self.rtt = rtt
         self.addr = addr
+
 
 class MyTracer(object):
 
@@ -246,71 +268,70 @@ class MyTracer(object):
         # Loop for starting the listener
         with MyTracer.lock:
             if not MyTracer.listening:
-                # important to use a THREADpool, and not a pool which is 
-                # processes we don't want processes, period. Processes in 
-                # Python are weird. 
+                # important to use a THREADpool, and not a pool which is
+                # processes we don't want processes, period. Processes in
+                # Python are weird.
                 pool = ThreadPool(1)
                 # start it
                 pool.apply_async(MyTracer.listen)
                 # set listening to true and then release the lock
                 MyTracer.listening = True
 
-
     def setPort(self):
         while True:
             with MyTracer.lock:
                 # Pick up a random port in the range 33434-33534
-                #self.port = random.choice(range(33434, 33464))
+                # self.port = random.choice(range(33434, 33464))
                 self.port = random.choice(range(__MINPORT__, __MAXPORT__))
-                
+
                 if self.port not in MyTracer.ports:
                     MyTracer.ports.add(self.port)
                     return
-            
+
             # Sleep to avoid cpu thrashing
             time.sleep(0.01)
 
     @classmethod
     def listen(cls):
-        """ 
+        """
         Method for starting a class-based listener
-        
+
         Note: Class-method, not instance-method, serves all instances
         """
         try:
             # Create a reusable reviever
             # We will use this throughout the lifecycle
-            print ("(listener) Starting")
+            print("(listener) Starting")
             r4, r6 = cls.create_receiver()
 
             while True:
-            
+
                 localport = None
                 addr = None
 
                 # Get the sema, then try to recieve
-                # Ergo we wait here untill a sending thread signals that we 
+                # Ergo we wait here untill a sending thread signals that we
                 # should wait for something
                 cls.recieveSema.acquire()
 
                 try:
                     # Read from socket. Will timeout based on socket settings.
                     # Timeout will raise socket.error
-                    # We don't care about big packets. They are prolly not 
+                    # We don't care about big packets. They are prolly not
                     # coming from us anyhow
                     data, addr = r4.recvfrom(1024)
-                    
+
                     # Check that it is an ICMP package and its a 3 / 3 or 11 / 0
                     #  i.e.
                     # destination uncreachable / port unreachable
-                    # or 
+                    # or
                     # ttl exceeded / ttl exceeded in traffic
                     # see https://tools.ietf.org/html/rfc792 for details
                     # That means (in an IP-packet sense) it has to be either
                     # byte  9 == 1 (ICMP)
                     # byte 20 == 3 (destination unreachable)
                     # byte 21 == 3 (port unreachable)
-                    # or 
+                    # or
                     # byte  9 ==  1 (ICMP)
                     # byte 20 == 11 (time-to-live exceeded)
                     # byte 21 ==  0 (ttl exceeded in traffic)
@@ -318,27 +339,29 @@ class MyTracer(object):
                         # Not ICMP, don't really know what to do here, skip it?
                         # lets skip it
                         continue
-                    elif (not (data[20] == 11 and data[21] == 0) 
-                        and not (data[20] == 11 and data[21] == 3) 
-                        and not (data[20] == 11 and data[21] == 10) 
-                        and not (data[20] == 11 and data[21] == 13) 
-                        and not (data[20] == 3 and data[21] == 0) 
-                        and not (data[20] == 3 and data[21] == 3) 
-                        and not (data[20] == 3 and data[21] == 10) 
-                        and not (data[20] == 3 and data[21] == 13)):
+                    elif (
+                        not (data[20] == 11 and data[21] == 0)
+                        and not (data[20] == 11 and data[21] == 3)
+                        and not (data[20] == 11 and data[21] == 10)
+                        and not (data[20] == 11 and data[21] == 13)
+                        and not (data[20] == 3 and data[21] == 0)
+                        and not (data[20] == 3 and data[21] == 3)
+                        and not (data[20] == 3 and data[21] == 10)
+                        and not (data[20] == 3 and data[21] == 13)
+                    ):
                         # ICMP which is not 3/3-10-13 or 11/0
                         continue
 
                     # Here we know its ICMP *and* useful
 
                     # Get the port from the data
-                    # Normally the port for the request will be in 
-                    # position 50+51 (if only counting IP-packet bytes) 
+                    # Normally the port for the request will be in
+                    # position 50+51 (if only counting IP-packet bytes)
                     # or position 64+65 if counting the entire eth-frame
                     # we reduce dependencies by only looking at the ip-frame
-                    # as a buffer of bytes rather than importing packages for 
+                    # as a buffer of bytes rather than importing packages for
                     # parsing IP-packets and ETH-frames
-                    localport = data[50]*256+data[51]    
+                    localport = data[50] * 256 + data[51]
                     endTimer = time.time()
                     # get the host from addr (i.e. addr[0], addr[1] is port which is 0 for ICMP)
                     addr = addr[0]
@@ -349,53 +372,55 @@ class MyTracer(object):
                     try:
                         # Jump to wait for next packet
                         # We probably didn't recieve anything and won't do it later
-                        #print ("Got socketerror {:}".format(e))
+                        # print ("Got socketerror {:}".format(e))
                         # Read from socket. Will timeout based on socket settings.
                         # Timeout will raise socket.error
                         # We don't care about big packets. They are prolly not coming from us anyhow
                         data, addr = r6.recvfrom(1024)
-                        
+
                         # Check that it is an ICMP package and its a 3 / 3 or 11 / 0
                         #  i.e.
                         # destination uncreachable / port unreachable
-                        # or 
+                        # or
                         # ttl exceeded / ttl exceeded in traffic
                         # see https://tools.ietf.org/html/rfc4443 for details
                         # That means (in an IP-packet sense) it has to be either
                         # byte  8 == 58 (ICMPv6)
                         # byte 40 ==  3 (destination unreachable)
                         # byte 41 ==  3 (port unreachable)
-                        # or 
+                        # or
                         # byte  8 == 58 (ICMPv6)
                         # byte 40 == 11 (time-to-live exceeded)
                         # byte 41 ==  0 (ttl exceeded in traffic)
-                        if not data[8] == 58: 
+                        if not data[8] == 58:
                             # Not ICMP, don't really know what to do here, skip it?
                             # lets skip it
                             continue
-                        elif not (data[40] == 3 and data[41] == 0) \
-                            and not (data[40] == 3 and data[41] == 1) \
-                            and not (data[40] == 1):
+                        elif (
+                            not (data[40] == 3 and data[41] == 0)
+                            and not (data[40] == 3 and data[41] == 1)
+                            and not (data[40] == 1)
+                        ):
                             # ICMP which is not 3/3-10-13 or 11/0
                             continue
 
                         # Here we know its ICMP *and* useful
 
                         # Get the port from the data
-                        # Normally the port for the request will be in 
-                        # position 50+51 (if only counting IP-packet bytes) 
+                        # Normally the port for the request will be in
+                        # position 50+51 (if only counting IP-packet bytes)
                         # or position 64+65 if counting the entire eth-frame
                         # we reduce dependencies by only looking at the ip-frame
-                        # as a buffer of bytes rather than importing packages for 
+                        # as a buffer of bytes rather than importing packages for
                         # parsing IP-packets and ETH-frames
                         # moved for icmpv6 (+40)
-                        localport = data[90]*256+data[91]    
+                        localport = data[90] * 256 + data[91]
                         endTimer = time.time()
                         # get the host from addr (i.e. addr[0], addr[1] is port which is 0 for ICMP)
                         addr = addr[0]
 
                     except socket.error as e2:
-                        dprint ("listener got socket.error: {:}".format(e2))
+                        dprint("listener got socket.error: {:}".format(e2))
                         continue
 
                 if localport not in cls.runningQueries.keys():
@@ -414,7 +439,7 @@ class MyTracer(object):
 
                     # store the hops we've made
                     query.hops.append(Hop(addr, timeCost))
-                    
+
                 # signal the waiting sender thread to continue
                 query.sema.release()
 
@@ -422,28 +447,28 @@ class MyTracer(object):
         # should really be taken care of somewhere, but I aint got time for that!
         except AttributeError as ae:
             # happens a lot during refactor (pylint has some issues?)
-            print ("listener got AttributeError {:}".format(ae))
+            print("listener got AttributeError {:}".format(ae))
         except KeyError as ke:
             # probably due to accessing wrong key in the dict
-            print ("listener got KeyError: {:}".format(ke))
+            print("listener got KeyError: {:}".format(ke))
         except PermissionError as pe:
-            print ("Permission error, we cannot trace, re raising")
+            print("Permission error, we cannot trace, re raising")
             raise pe
         except:
             # should not happen any more
-            print ("Unexpected error in listener: {:}".format(sys.exc_info()[0]))
+            print("Unexpected error in listener: {:}".format(sys.exc_info()[0]))
         finally:
             # So, the litener has crashed, lets set it as off so the next instance of the
             # class will start a new one.
-            print ("(listener) Closing down the listener due to error!")
+            print("(listener) Closing down the listener due to error!")
 
             # Does not support windows for now
-            #if os.name == "nt":
-                # We have windows. Can't get it to work though
+            # if os.name == "nt":
+            # We have windows. Can't get it to work though
             #    receiver.ioctl(socket.SIO_RCVALL, socket.RCVALL_OFF)
 
             cls.listening = False
-            
+
     def trun(self) -> list:
         """
         Run the tracer with threads
@@ -462,15 +487,13 @@ class MyTracer(object):
                 ip_inner = ipaddress.ip_address(socket.gethostbyname(self.dst))
                 dst_ip = ip_inner
             except socket.error as e:
-                raise IOError('Unable to resolve {}: {}', self.dst, e)
+                raise IOError("Unable to resolve {}: {}", self.dst, e)
 
         # print something to output if we want to
         if not self.quiet:
             # print something to output if we want to
-            text = 'traceroute to {} ({}), {} hops max'.format(
-                self.dst,
-                dst_ip.exploded,
-                self.hops
+            text = "traceroute to {} ({}), {} hops max".format(
+                self.dst, dst_ip.exploded, self.hops
             )
             print(text)
 
@@ -485,14 +508,14 @@ class MyTracer(object):
             sender = self.create_sender(dst_ip)
 
             if not self.quiet:
-                print ("sending to {:} with ttl {:}".format(self.dst, self.ttl))
+                print("sending to {:} with ttl {:}".format(self.dst, self.ttl))
 
             try:
-                sender.sendto(b'', (dst_ip.compressed, self.port))
+                sender.sendto(b"", (dst_ip.compressed, self.port))
             except Exception as e:
                 print("MyTrace Error with {:},{:}".format(dst_ip.exploded, self.port))
                 print(e)
-                raise IOError('MyTrace Unable to send {}: {}', dst_ip.compressed, e)
+                raise IOError("MyTrace Unable to send {}: {}", dst_ip.compressed, e)
 
             # signal that something is ready
             MyTracer.recieveSema.release()
@@ -505,22 +528,22 @@ class MyTracer(object):
                 # we got a nice response, lets use it
                 # get the last hop
                 lastHop = myQuery.hops[-1]
-            
+
                 if lastHop.addr:
                     timeCost = lastHop.rtt
 
                     # Only print shit if we really need it
                     if not self.quiet:
-                        print('{:<4} {} {} ms'.format(self.ttl, lastHop.addr, timeCost))
+                        print("{:<4} {} {} ms".format(self.ttl, lastHop.addr, timeCost))
 
                     if lastHop.addr == self.dst:
                         break
-                    
+
                     if lastHop.addr == dst_ip:
                         break
                 else:
                     if not self.quiet:
-                        print('{:<4} *'.format(self.ttl))
+                        print("{:<4} *".format(self.ttl))
 
             self.ttl += 1
 
@@ -534,11 +557,10 @@ class MyTracer(object):
                 del MyTracer.runningQueries[self.port]
                 MyTracer.ports.remove(self.port)
             except:
-                print ("Got unknown error when cleaning up")
-            
+                print("Got unknown error when cleaning up")
 
         # End with returning the hops
-        # for now we enumerate a list with the addresses. 
+        # for now we enumerate a list with the addresses.
         # Maybe might be interesting for some to return the rtt as well?
         return list([x.addr for x in myQuery.hops])
 
@@ -553,9 +575,7 @@ class MyTracer(object):
         """
 
         s4 = socket.socket(
-            family=socket.AF_INET,
-            type=socket.SOCK_RAW,
-            proto=socket.IPPROTO_ICMP
+            family=socket.AF_INET, type=socket.SOCK_RAW, proto=socket.IPPROTO_ICMP
         )
 
         timeout = struct.pack("ll", MyTracer.timeoutSec, 0)
@@ -563,19 +583,17 @@ class MyTracer(object):
 
         try:
             # We are not binding a port, recieving ICMP, i.e. neither TCP nor UDP, ergo no port
-            s4.bind(('', 0))
+            s4.bind(("", 0))
         except socket.error as e:
-            raise IOError('Unable to bind receiver socket: {}'.format(e))
+            raise IOError("Unable to bind receiver socket: {}".format(e))
 
         # If we are windows, promiscious mode on
         # Does not work, we fail earlier for windows
-        #if os.name == "nt":
+        # if os.name == "nt":
         #    s.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
 
         s6 = socket.socket(
-            family=socket.AF_INET6,
-            type=socket.SOCK_RAW,
-            proto=socket.IPPROTO_ICMPV6
+            family=socket.AF_INET6, type=socket.SOCK_RAW, proto=socket.IPPROTO_ICMPV6
         )
 
         timeout = struct.pack("ll", MyTracer.timeoutSec, 0)
@@ -583,9 +601,9 @@ class MyTracer(object):
 
         try:
             # We are not binding a port, recieving ICMP, i.e. neither TCP nor UDP, ergo no port
-            s6.bind(('', 0))
+            s6.bind(("", 0))
         except socket.error as e:
-            raise IOError('Unable to bind receiver socket: {}'.format(e))
+            raise IOError("Unable to bind receiver socket: {}".format(e))
 
         return s4, s6
 
@@ -597,16 +615,12 @@ class MyTracer(object):
         """
         if isinstance(ipvx, ipaddress.IPv4Address):
             s = socket.socket(
-                family=socket.AF_INET,
-                type=socket.SOCK_DGRAM,
-                proto=socket.IPPROTO_UDP
+                family=socket.AF_INET, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP
             )
             s.setsockopt(socket.SOL_IP, socket.IP_TTL, self.ttl)
         elif isinstance(ipvx, ipaddress.IPv6Address):
             s = socket.socket(
-                family=socket.AF_INET6,
-                type=socket.SOCK_DGRAM,
-                proto=socket.IPPROTO_UDP
+                family=socket.AF_INET6, type=socket.SOCK_DGRAM, proto=socket.IPPROTO_UDP
             )
             s.setsockopt(socket.IPPROTO_IPV6, socket.IP_TTL, self.ttl)
         else:
@@ -616,16 +630,25 @@ class MyTracer(object):
 
 
 if __name__ == "__main__":
-    # We are running this one, lets run 
+    # We are running this one, lets run
     # just something for the heck of it
     num_cores = 64
-    listargs = ["8.8.8.8", "8.8.4.4", "www.washingtonpost.com", "www.dn.se", "8.8.8.8", "www.dn.se", "8.8.8.8", "8.8.4.4"]
-    
-    print (os.name)
+    listargs = [
+        "8.8.8.8",
+        "8.8.4.4",
+        "www.washingtonpost.com",
+        "www.dn.se",
+        "8.8.8.8",
+        "www.dn.se",
+        "8.8.8.8",
+        "8.8.4.4",
+    ]
+
+    print(os.name)
     results = TraceManager.TraceAll(listargs)
 
     print("(MAIN) Results gotten")
 
-    for h,r in zip(listargs,results):
-        print ("(MAIN) One trace:({:})".format(h))
-        print (r)
+    for h, r in zip(listargs, results):
+        print("(MAIN) One trace:({:})".format(h))
+        print(r)
