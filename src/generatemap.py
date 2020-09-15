@@ -1,4 +1,4 @@
-#!/bin/python3
+#!/bin/env python3
 
 # Copyright (c) 2019, 2020 Fredrik Lindeberg <flindeberg@gmail.com>
 # All rights reserved.
