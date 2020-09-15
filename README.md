@@ -40,6 +40,10 @@ You also need som python modules, and of course python (3+) itself. Python is mo
 
 When you have pip(3) installed, run the following:
 
+    pip3 install -r requirements.txt
+
+Or manually:
+
     pip3 install networkx matplotlib splinter bs4 pyasn dnspython pycountry elevate pandas cleanco string_grouper pygraphviz requests
 
 Depending on system pip3 might not be aliased and instead pip should be used. Also some systems might require pip3 to be run as root (or use the `--user` flag to do a user install).
