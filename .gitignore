@@ -1,8 +1,28 @@
-## osx files
-.DS_Store
-
 ## pyc-files
 **/*.pyc
 
 ## generated pngs
 src/examplehars/*.png
+
+# Virtual Environment
+venv/
+
+# Editor Configurations
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+
+# Pip
+src/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# MacOS Folder Metadata File
+.DS_Store
+
+# Vim swap files
+*.swp
