@@ -14,6 +14,16 @@ Depends heavily on other python modules and a contains a modified version of py-
 
 And a word of warning, this repository exists to show code used in my thesis, not primarily so others can reuse this. The code quality as awful, use at your own risk :-)
 
+
+If you use this in your research, please cite (if possible):
+- Lindeberg, Fredrik. “Coordinating the Internet.” Licentiate Thesis, Linköping University, 2019. http://urn.kb.se/resolve?urn=urn:nbn:se:liu:diva-161812.
+
+## Example output 
+
+![Image of the Internet](https://raw.githubusercontent.com/flindeberg/internet-tools/master/resources/example_run.svg)
+
+An example of visit to four Swedish newssites. 
+
 ## Installation instructions
 
 First off, we need all dependencies
