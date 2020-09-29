@@ -25,9 +25,14 @@ file=top_orgs.txt
 
 [ -f "$file" ] && rm "$file"
 
-for str in "Cisco" "Juniper" "Microsoft\|msft" "Yahoo" "Google" "Apple" "Harvard" "Facebook\|fb.com"
+## Some organizations and different names for them, usus the standard grep format, i.e. "|" as "or"
+for str in "Cisco" "Ericsson" "Huawei" "Juniper" "Microsoft\|msft\|\.ms" "Nokia" "IBM" "ATT" "MIT" "Google" "Yahoo" "IEEE" "Intel" "Qualcomm" "Apple" "ICANN" "Harvard" "Facebook\|fb.com" "Amazon\|aws" 
 do
     res=$(grep -i "email" ${rfcs}/*.txt | sed -E 's/["><]//' | sed -E 's/.*[.@]([A-Za-z0-9-]+\.[A-Za-z0-9]*$)/\1/' | grep -vP "rfc\d.*txt" | grep -i $str | wc -l)
     cmp=$(echo $str | perl -pe 's/(.*?)(\\..*)/\1/')
     echo $res $cmp | awk '{ print $1, "&", $2, "\\\\" }' >> $file
 done
+
+# sort files
+sort -nr $file -o $file
+
