@@ -21,7 +21,7 @@ jobs:
       with:
         python-version: 3.8
     - name: Install grapviz dev
-      run: sudo apt install libgraphviz-dev python3-pygraphviz
+      run: sudo apt-get install libgraphviz-dev python3-pygraphviz
     - name: Install python dependencies
       run: |
         python -m pip install --upgrade pip
@@ -29,7 +29,7 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Install chrome-har-capturer and browser
       run: |
-        sudo apt install npm chromium-browser
+        sudo apt-get install npm chromium-browser
         sudo npm install --global chrome-har-capturer
     - name: Prepare pyasn with fresh data
       run: |
