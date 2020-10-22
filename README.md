@@ -18,6 +18,19 @@ And a word of warning, this repository exists to show code used in my thesis, no
 If you use this in your research, please cite (if possible):
 - Lindeberg, Fredrik. “Coordinating the Internet.” Licentiate Thesis, Linköping University, 2019. http://urn.kb.se/resolve?urn=urn:nbn:se:liu:diva-161812.
 
+bibtex:
+```
+@thesis{Lindeberg2019,
+  title = {Coordinating the {{Internet}}},
+  author = {Lindeberg, Fredrik},
+  date = {2019},
+  institution = {{Linköping University}},
+  url = {http://urn.kb.se/resolve?urn=urn:nbn:se:liu:diva-161812},
+  pagetotal = {383},
+  type = {Licentiate Thesis}
+}
+```
+
 ## Example output 
 
 ![Image of the Internet](https://raw.githubusercontent.com/flindeberg/internet-tools/master/resources/example_run.svg)
