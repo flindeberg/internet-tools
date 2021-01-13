@@ -19,10 +19,10 @@ rsync -avz --delete ftp.rfc-editor.org::rfcs-text-only ${rfcs}
 # currently doesn't work well with dual "tlds", like co.uk, but they are so few they don't matter for now
 
 echo "grepping for emails to top8.txt"
-${grep} -i 'email:' ${rfcs}/*.txt | sed -E 's/[\"><]//' | sed -E 's/.*[.@]([A-Za-z0-9-]+\.[A-Za-z0-9]*$)/\1/' | ${grep} -vP 'rfc\d.*txt' | sort | uniq -c | sort -nr | head -n 8 | awk '{ print $1, "&", $2, "\\\\" }' > top8.txt
+${grep} -i 'email:' ${rfcs}/*.txt | sed -E 's/[\"><]//' | sed -E 's/.*[.@]([A-Za-z0-9-]+\.[A-Za-z0-9]*$)/\1/' | ${grep} -vP 'rfc\d.*txt' | sort | uniq -c | sort -nr | head -n 9 | awk '{ print $1, "&", $2, "\\\\" }' > top8.txt
 
 echo "grepping for top universities (assuming .edu)"
-${grep} -i "email" ${rfcs}/*.txt | sed -E 's/["><]//' | sed -E 's/.*[.@]([A-Za-z0-9-]+\.[A-Za-z0-9]*$)/\1/' | ${grep} -vP "rfc\d.*txt" | ${grep} "\.edu" | sort | uniq -c | sort -rn | head -n 10 | awk '{ print $1, "&", $2, "\\\\" }' > top_uni.txt
+${grep} -i "email" ${rfcs}/*.txt | sed -E 's/["><]//' | sed -E 's/.*[.@]([A-Za-z0-9-]+\.[A-Za-z0-9]*$)/\1/' | ${grep} -vP "rfc\d.*txt" | ${grep} "\.edu" | sort | uniq -c | sort -rn | head -n 8 | awk '{ print $1, "&", $2, "\\\\" }' > top_uni.txt
 
 # above is naive, lets be smarter
 
@@ -51,3 +51,9 @@ csplit -sf tmp_ $file $line
 paste -d "-" tmp_0* | sed 's/\\\\-/\& /g' > top_orgs_2col.txt
 
 rm tmp_*
+
+echo "merged to two col format for top orgs"
+
+paste -d "-" top8.txt top_uni.txt | sed 's/\\\\-/\& /g' > top_domains_2col.txt
+
+echo "merged to two col format for domains"
