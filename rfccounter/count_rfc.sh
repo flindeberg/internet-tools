@@ -58,22 +58,16 @@ bcp_nr=$(ls rfcs/bcp/bcp[0-9]*.txt | wc -l)
 
 bcp_size=$(get_rfc_filenames $idx | xargs du -cksh | tail -n1 | cut -f1)
 
-# output to std out
-printf "Words: RFC %'d, STD %'d, BCP %'d \n" $rfc_words $intstd_words $bcp_words
-printf "Lines: RFC %'d, STD %'d, BCP %'d \n" $rfc_lines $intstd_lines $bcp_lines
-
-
 ## prep the actual file used in latex table
 file=rfc_word_lines.txt
 
 [ -f "$file" ] && rm "$file"
 
-
 printf 'Total & \\num{%d} & \\num{%d} & \\num{%d} \\\\ \n' $rfc_max $intstd_max $bcp_max >> $file
 printf 'Active & \\num{%d} & \\num{%d} & \\num{%d} \\\\ \n' $rfc_nr $intstd_nr $bcp_nr >> $file
 printf 'Words & \\num{%d} & \\num{%d} & \\num{%d} \\\\ \n' $rfc_words $intstd_words $bcp_words >> $file
 printf 'Lines & \\num{%d} & \\num{%d} & \\num{%d} \\\\ \n' $rfc_lines $intstd_lines $bcp_lines >> $file
-printf 'Size & \\SI{%d}{\\mega\\bytes} & \\SI{%d}{\\mega\\bytes} & \\SI{%d}{\\mega\\bytes} \\\\ \n' ${rfc_size%?} ${intstd_size%?} ${bcp_size%?} >> $file
+printf 'Size & \\SI{%d}{\\mega\\byte} & \\SI{%d}{\\mega\\byte} & \\SI{%d}{\\mega\\byte} \\\\ \n' ${rfc_size%?} ${intstd_size%?} ${bcp_size%?} >> $file
 
 # #HACK remove the last "\\" and add newline again
 truncate -s-4 $file
