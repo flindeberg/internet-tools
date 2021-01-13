@@ -43,3 +43,11 @@ done
 # sort files
 sort -nr $file -o $file
 
+line=$(echo "($(wc -l top_orgs.txt | cut -f1 -d' ') + 1) / 2 + 1" | bc)
+
+[ -f "tmp_*" ] && rm "tmp_*"
+
+csplit -sf tmp_ $file $line
+paste -d "-" tmp_0* | sed 's/\\\\-/\& /g' > top_orgs_2col.txt
+
+rm tmp_*
