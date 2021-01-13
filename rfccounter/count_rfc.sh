@@ -73,7 +73,7 @@ printf 'Total & \\num{%d} & \\num{%d} & \\num{%d} \\\\ \n' $rfc_max $intstd_max 
 printf 'Active & \\num{%d} & \\num{%d} & \\num{%d} \\\\ \n' $rfc_nr $intstd_nr $bcp_nr >> $file
 printf 'Words & \\num{%d} & \\num{%d} & \\num{%d} \\\\ \n' $rfc_words $intstd_words $bcp_words >> $file
 printf 'Lines & \\num{%d} & \\num{%d} & \\num{%d} \\\\ \n' $rfc_lines $intstd_lines $bcp_lines >> $file
-printf 'Size & \\SI{%d}{\\mega\\bytes & \\SI{%d}{\\mega\\bytes & \\SI{%d}{\\mega\\bytes} \\\\ \n' ${rfc_size%?} ${intstd_size%?} ${bcp_size%?} >> $file
+printf 'Size & \\SI{%d}{\\mega\\bytes} & \\SI{%d}{\\mega\\bytes} & \\SI{%d}{\\mega\\bytes} \\\\ \n' ${rfc_size%?} ${intstd_size%?} ${bcp_size%?} >> $file
 
 # #HACK remove the last "\\" and add newline again
 truncate -s-4 $file
