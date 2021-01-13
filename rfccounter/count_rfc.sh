@@ -1,5 +1,10 @@
 #!/bin/env sh
 
+# set folder
+rfcs=rfcs
+
+echo "rsyncing text versions of rfcs (and int stds)"
+rsync -avz --delete ftp.rfc-editor.org::rfcs-text-only ${rfcs}
 
 ## rfcs, just cat and count
 rfc_words=$(cat rfcs/rfc[0-9]*.txt | wc -w)
@@ -16,13 +21,13 @@ function get_rfc_content {
 }
 
 ## Use the std-index to figure out which rfcs to look in
-idx=rfcs/std-index.txt
+idx=${rfcs}/std-index.txt
 intstd_words=$(get_rfc_content $idx | wc -w)
 intstd_lines=$(get_rfc_content $idx | wc -l)
 
 
 ## Use the bcp-index to figure out which rfcs to look in
-idx=rfcs/bcp-index.txt
+idx=${rfcs}/bcp-index.txt
 intstd_words=$(get_rfc_content $idx | wc -w)
 intstd_lines=$(get_rfc_content $idx | wc -l)
 
