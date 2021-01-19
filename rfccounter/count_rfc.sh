@@ -1,4 +1,4 @@
-#!/bin/env sh
+#!/usr/bin/env zsh
 
 # set folder
 rfcs=rfcs
