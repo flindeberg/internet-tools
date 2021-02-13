@@ -58,10 +58,15 @@ bcp_nr=$(ls rfcs/bcp/bcp[0-9]*.txt | wc -l)
 
 bcp_size=$(get_rfc_filenames $idx | xargs du -cksh | tail -n1 | cut -f1)
 
+
+
+
 ## prep the actual file used in latex table
 file=rfc_word_lines.txt
 
 [ -f "$file" ] && rm "$file"
+
+echo "Writing results to '$file'"
 
 printf 'Total & \\num{%d} & \\num{%d} & \\num{%d} \\\\ \n' $rfc_max $intstd_max $bcp_max >> $file
 printf 'Active & \\num{%d} & \\num{%d} & \\num{%d} \\\\ \n' $rfc_nr $intstd_nr $bcp_nr >> $file
