@@ -1,6 +1,6 @@
 # internet-tools
 
-![Github test all](https://github.com/flindeberg/internet-tools/workflows/Build%20and%20test%20CI/badge.svg) ![Github test all](https://github.com/flindeberg/internet-tools/workflows/Lint/badge.svg)
+![Github test all](https://github.com/flindeberg/internet-tools/workflows/Build%20and%20test%20CI/badge.svg) ![Github test all](https://github.com/flindeberg/internet-tools/workflows/Lint/badge.svg) ![Github test all](https://github.com/flindeberg/internet-tools/workflows/Test%20RFC%20counting%20(including%20download)/badge.svg)
 
 
 A collection of python tools useful in an Internet context.
