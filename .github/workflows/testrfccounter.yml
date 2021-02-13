@@ -21,7 +21,7 @@ jobs:
     - name: Parse for organizations and domains
       run: |
         cd rfccounter
-        zsh parse-rfc.sh
+        zsh parse_rfc.sh
     - name: Upload parse results
       uses: actions/upload-artifact@v2
       with:
@@ -30,7 +30,7 @@ jobs:
     - name: Count RFCs and content
       run: |
         cd rfccounter
-        zsh count-rfc.sh
+        zsh count_rfc.sh
     - name: Upload count results
       uses: actions/upload-artifact@v2
       with:
