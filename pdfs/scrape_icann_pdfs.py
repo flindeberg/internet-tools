@@ -1,7 +1,6 @@
 import scrapy
 from scrapy import linkextractors
 from scrapy.http.request import Request
-from scrapy.linkextractors.lxmlhtml import _canonicalize_link_url
 
 from scrapy.spiders import CrawlSpider, Rule
 from scrapy.linkextractors import LinkExtractor
