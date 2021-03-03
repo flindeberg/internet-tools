@@ -9,7 +9,7 @@ echo "Starting spider, will take a couple of hours"
 
 scrapy runspider -L WARNING scrape_icann_pdfs.py
 
-files=$(ll pdfs/ | wcl -l)
+files=$(ls -al pdfs/ | wc -l)
 
 echo "Found ${files} pdfs!"
 
