@@ -13,7 +13,11 @@ class IcannSpider(CrawlSpider):
     name = 'icann'
     allowed_domains = ["icann.org"]
     start_urls = ['https://www.icann.org/resources/pages/cctlds/cctlds-en', 'https://icann.org']
-    rules = [Rule(LinkExtractor(deny_extensions=[ele for ele in linkextractors.IGNORED_EXTENSIONS if ele != "pdf"]), callback='parse_item', follow=True)]
+    rules = [Rule(LinkExtractor(
+        deny_extensions=[ele for ele in linkextractors.IGNORED_EXTENSIONS if ele != "pdf"],
+        deny="download/temp/pdfexport-.*"
+        ), 
+        callback='parse_item', follow=True)]
 
     ## Parse already downloaded urls
     def parse_item(self, response):
