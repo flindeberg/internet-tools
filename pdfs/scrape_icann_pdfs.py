@@ -34,7 +34,6 @@ class IcannSpider(CrawlSpider):
     start_urls = ['https://www.icann.org/resources/pages/cctlds/cctlds-en', 'https://icann.org']
     rules = [Rule(LinkExtractor(
                     deny_extensions=(ele for ele in linkextractors.IGNORED_EXTENSIONS if ele != "pdf"),
-                    canonicalize=False,
                     ), 
                 callback='parse_item', follow=True)]
 
