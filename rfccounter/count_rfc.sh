@@ -18,7 +18,7 @@ function get_max_index {
 }
 
 function get_rfc_list {
-    grep -o "RFC[0-9]*" $1 | sed 's/^RFC0*//'
+    grep -ozP "\(Also (.*?)\)" $1 | grep -ozP "RFC[0-9]+" | sed 's/RFC/\n/g' | sed 's/^0*//' | sort -n | uniq | sed '/^$/d' | xargs -I {} -n 1 echo "{}"
 }
 
 function get_rfc_filenames {
