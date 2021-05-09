@@ -73,7 +73,7 @@ fi
     
 # Give each page 20 sec to load in total, and wait 4 sec after load
 echo "Starting chrome-har-capturer"
-xargs chrome-har-capturer --retry 3 --grace 4000 --timeout 20000 --abort-on-failure -o $folder/last_run.har < $1
+xargs chrome-har-capturer --retry 3 --grace 4000 --timeout 20000 -o $folder/last_run.har < $1
 #xargs chrome-har-capturer -o $folder/last_run.har < $1
 
 # HACK 
