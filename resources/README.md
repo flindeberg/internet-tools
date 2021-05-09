@@ -15,3 +15,7 @@ An example visit to a random selection of websites from the Alexa-ranking.
 ![Image of the Internet](https://raw.githubusercontent.com/flindeberg/internet-tools/master/resources/alexa_100.svg)
 
 An example visit to all of the top 100 websites of the Alexa-ranking.
+
+![Image of the Internet](https://raw.githubusercontent.com/flindeberg/internet-tools/master/resources/alexa_100_unfiltered.svg)
+
+An example visit to all of the top 100 websites of the Alexa-ranking without any form of filtering.
