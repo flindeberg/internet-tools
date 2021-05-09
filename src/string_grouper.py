@@ -226,7 +226,7 @@ class StringGrouper(object):
 
     @validate_is_fit
     def remove_match(self, master_side: str, dupe_side: str) -> "StringGrouper":
-        """ Removes a match from the StringGrouper"""
+        """Removes a match from the StringGrouper"""
         master_indices, dupe_indices = self._get_indices_of(master_side, dupe_side)
         # In the case of having only a master series, we need to remove both the master - dupe match
         # and the dupe - master match:

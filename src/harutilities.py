@@ -66,7 +66,7 @@ class HarHost:
         )  # start with assuming that the trace is missing
 
     def setASNLookup(self, lookup: asnutils.ASNLookup):
-        """ Force a specific ASNLookup for this HarHost (could be useful for speed) """
+        """Force a specific ASNLookup for this HarHost (could be useful for speed)"""
         self._asnlookup = lookup
 
     @property
@@ -152,7 +152,7 @@ class HarHost:
             ## put it in the list, that way we still keep it even though we could not resolve it
 
     def getToTrace(self):
-        """ Helper func for future refactoring """
+        """Helper func for future refactoring"""
         return self.ips
 
     def trace(self):
@@ -318,7 +318,7 @@ HostDict = Dict[ipaddress._BaseAddress, HarHost]
 
 
 class HarResult:
-    """ Class for storing data from har request """
+    """Class for storing data from har request"""
 
     def __init__(self, file):
         # Do nothing!
@@ -578,7 +578,7 @@ class CheckHAR:
             print("Parser loaded, {:} hosts in total".format(len(self.result.hosts)))
 
     def cook(self):
-        """ Cooks the the Har so we can get the edges. Has to be called prior to getEdges """
+        """Cooks the the Har so we can get the edges. Has to be called prior to getEdges"""
 
         # type hint them, we are reusing them
         key: str
