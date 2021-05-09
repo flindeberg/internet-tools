@@ -236,50 +236,56 @@ class HarHost:
             current: AS
             for current in ips:
                 # current is here an AS
-                country = pycountry.countries.get(alpha_2=current.cc)
+                try:
+                    country = pycountry.countries.get(alpha_2=current.cc)
 
-                # use lastNode, as well as the current one
-                # current is ASN, lastNode might be "localhost" or ASN
-                # doublecheck that we are not referencing ourselves
-                if lastNode[0] != current.GetPrettyName():
-                    edges.append(
-                        EdgeTuple(
-                            lastNode[0],
-                            current.GetPrettyName(),
-                            lastNode[1],
-                            EdgeType.asn,
-                            lastNode[1],
-                            data=self.size,
+                    # use lastNode, as well as the current one
+                    # current is ASN, lastNode might be "localhost" or ASN
+                    # doublecheck that we are not referencing ourselves
+                    if lastNode[0] != current.GetPrettyName():
+                        edges.append(
+                            EdgeTuple(
+                                lastNode[0],
+                                current.GetPrettyName(),
+                                lastNode[1],
+                                EdgeType.asn,
+                                lastNode[1],
+                                data=self.size,
+                            )
                         )
-                    )
 
-                if country is not None:  # only add countries which exist
-                    # add country connection as well
-                    edges.append(
-                        EdgeTuple(
-                            country.name,
-                            current.GetPrettyName(),
-                            EdgeType.cc,
-                            EdgeType.asn,
-                            EdgeType.cc,
-                            data=current.asn,
+                    if country is not None:  # only add countries which exist
+                        # add country connection as well
+                        edges.append(
+                            EdgeTuple(
+                                country.name,
+                                current.GetPrettyName(),
+                                EdgeType.cc,
+                                EdgeType.asn,
+                                EdgeType.cc,
+                                data=current.asn,
+                            )
                         )
-                    )
 
-                # Handle company if present
-                if current.company is not None:
-                    edges.append(
-                        EdgeTuple(
-                            current.company,
-                            current.GetPrettyName(),
-                            EdgeType.company,
-                            EdgeType.asn,
-                            EdgeType.company,
+                    # Handle company if present
+                    if current.company is not None:
+                        edges.append(
+                            EdgeTuple(
+                                current.company,
+                                current.GetPrettyName(),
+                                EdgeType.company,
+                                EdgeType.asn,
+                                EdgeType.company,
+                            )
                         )
-                    )
 
-                # prepare for next round
-                lastNode = (current.GetPrettyName(), EdgeType.asn)
+                    # prepare for next round
+                    lastNode = (current.GetPrettyName(), EdgeType.asn)
+                except LookupError as e:
+                    ## Something else is fishy
+                    print("Not an country, skipping: '{:}' ({:})".format(current.cc, e))
+                except:
+                    print("Unexpected error:", sys.exc_info())
 
             # If we have a full trace its a "host", else its an
             # "indirect host" (i.e. ihost)
