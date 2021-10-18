@@ -189,7 +189,13 @@ class HarHost:
 
             filtered = list(filter(lambda x: x != "*", traces[key]))
             iplist = list(ipaddress.ip_address(x) for x in filtered)
+            ## Set the resolves ip last of the trace times out, this ensures proper AS match
+            if iplist[-1] != ipaddress.ip_address(key):
+                iplist.append(ipaddress.ip_address(key))
+                print("Added {:} last to {:}".format(ipaddress.ip_address(key), ipaddress.ip_address(key)))
+            
             self._ipstrace[ipaddress.ip_address(key)] = iplist
+
             ## Set the trace status, will be used for coloring later
             self._trace = edgeutils.TraceType.getTraceStatus(traces[key])
 
