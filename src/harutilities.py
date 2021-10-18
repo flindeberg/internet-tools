@@ -536,22 +536,22 @@ class CheckHAR:
         )
 
         with open(file) as json_data:
-            d = json.load(json_data)
+            d: dict = json.load(json_data)
 
             self.result.requests = len(d["log"]["entries"])
 
             if len(d["log"]["pages"]) > 0:
                 self.result.start = d["log"]["pages"][0]["startedDateTime"]
 
+            entry :dict
             for entry in d["log"]["entries"]:
-
+                
                 parsedhost = urlutils.GetHostFromString(entry["request"]["url"])
-
                 realsize = (
-                    entry["request"]["headersSize"]
-                    + entry["request"]["bodySize"]
-                    + entry["response"]["headersSize"]
-                    + entry["response"]["bodySize"]
+                    (entry["request"].get("headersSize", 0) or 0)
+                    + (entry["request"].get("bodySize", 0) or 0)
+                    + (entry["response"].get("headersSize", 0) or 0)
+                    + (entry["response"].get("bodySize", 0) or 0)
                 )
                 if "_transferSize" in entry["response"]:
                     transfersize = entry["response"]["_transferSize"]
