@@ -5,6 +5,12 @@ import math
 from dataclasses import dataclass
 from typing import List
 
+import matplotlib
+
+# non-interactive backend: this module only ever saves figures to file
+# (never plt.show()s them), and the interactive macosx backend crashes
+# when driven outside a real GUI app context (e.g. run from a script/subprocess)
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # import matplotlib.colors as clr
@@ -233,7 +239,10 @@ def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout="sfdp") -> List
     if graph_layout == "sfdp":
         ## Default to using graphviz, better and faster..
         graph_pos = nx.drawing.nx_agraph.graphviz_layout(
-            G, prog="neato", root="localhost", args="-Gmaxiter=200"
+            # trailing space required: networkx concatenates "-Groot={root}"
+            # onto args with no separator, which otherwise merges into one
+            # unparsable token (e.g. "-Gmaxiter=200-Groot=localhost")
+            G, prog="neato", root="localhost", args="-Gmaxiter=200 "
         )
     elif graph_layout == "spring":
         # graph_pos=nx.spring_layout(G, pos={startNode[0]: (0.5,0.5)}, fixed=startNode, iterations=150, scale=1)

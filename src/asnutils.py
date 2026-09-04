@@ -484,18 +484,18 @@ class ASNLookup:
         # start with iterating through the items and clean the names of potential companies
         asentity: AS
         for asn, asentity in self._asinfo.asas.items():
-            co = cleanco.cleanco(asentity.name)
+            original_name = asentity.name
+            cleaned_name = cleanco.basename(original_name)
             # Set both company name and name of the AS
             # we will change companyname later (potentially)
-            asentity.name = co.clean_name()
-            # asentity.company = co.clean_name()
-            asentity.presumtivecompany = co.clean_name()
+            asentity.name = cleaned_name
+            # asentity.company = cleaned_name
+            asentity.presumtivecompany = cleaned_name
 
             # Special case for Sweden and the US; since they show up alot
             # and share literals with others (i.e. "inc", "AB" etc)
             # HACK Perhaps fix to something more beautiful
-            tmpco = co.country()  # Issue with calling country in cleanco
-            # you can only call it once
+            tmpco = cleanco.matches(original_name, cleanco.countrysources())
             if tmpco:
                 if "United States of America" in tmpco:
                     asentity.cc = "US"
@@ -504,11 +504,11 @@ class ASNLookup:
 
             if asentity.cc is None and len(tmpco) == 1:
                 # try with name ("United States", "Sweden")
-                country = pycountry.countries.get(name=co.country[0])
+                country = pycountry.countries.get(name=tmpco[0])
                 if not country:
                     # try with official name
                     # ("United States of America", "Royal Kingdom of Sweden")
-                    country = pycountry.countries.get(official_name=co.country[0])
+                    country = pycountry.countries.get(official_name=tmpco[0])
 
                 if country:
                     asentity.cc = country.alpha_2
