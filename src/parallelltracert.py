@@ -28,17 +28,12 @@
 # Available in modified form at:
 # https://github.com/flindeberg/internet-tools
 
-# TODO ipv6
-# ipv6 does not work, feel free to fix it.
-# Issue is that the ipv6 packet when read as a buffer does not look as it
-# does on the wire (i.e. when captured by wireshark), so ICMPv6 packets
-# don't have the required fields available.
-# I do not know why
-
 """
 Core module
 
-Currently only works on OSX, possibly some Linux-flavours, but not guaranteed
+Works on OSX and Linux (not Windows). On Linux, tracing needs no elevated
+privileges (see UnprivilegedTracer below); elsewhere (e.g. macOS) it still
+needs root for raw ICMP sockets (see RawSocketTracer).
 """
 
 import ipaddress
@@ -70,6 +65,35 @@ def dprint(x):
     """
     if __tracedebug__:
         print(x)
+
+
+def _linux_unprivileged_available() -> bool:
+    """
+    Whether we can trace without raw sockets (and therefore without root) on
+    this interpreter/platform, using IP_RECVERR/IPV6_RECVERR + MSG_ERRQUEUE
+    to read ICMP errors off a plain UDP socket's error queue.
+
+    This is a Linux-only kernel/socket-API feature - macOS/BSD have no
+    equivalent, so raw ICMP sockets (and root) are always required there.
+    """
+    return (
+        sys.platform.startswith("linux")
+        and hasattr(socket, "IP_RECVERR")
+        and hasattr(socket, "IPV6_RECVERR")
+        and hasattr(socket, "MSG_ERRQUEUE")
+    )
+
+
+def requires_root() -> bool:
+    """Whether tracing on this platform needs raw sockets, and therefore root."""
+    return not _linux_unprivileged_available()
+
+
+def create_tracer(dst, hops=30, quiet=False):
+    """Factory picking the best tracer implementation for this platform."""
+    if _linux_unprivileged_available():
+        return UnprivilegedTracer(dst, hops=hops, quiet=quiet)
+    return RawSocketTracer(dst, hops=hops, quiet=quiet)
 
 
 ## Class for "singletoning" the traces, often quite useful
@@ -182,7 +206,7 @@ class TraceManager(object):
             # release lock since host is set as "being traced"
             # trace
             # use tracer onece, and then kill
-            ips = MyTracer(local_ip, hops=30, quiet=True).trun()
+            ips = create_tracer(local_ip, hops=30, quiet=True).trun()
 
             self.__sema.acquire()
             # get the lock back and add to traced
@@ -230,7 +254,174 @@ class Hop(object):
         self.addr = addr
 
 
-class MyTracer(object):
+# struct sock_extended_err (linux/errqueue.h) origin values we care about,
+# i.e. the error actually came back from the network as an ICMP(v6) message
+# (as opposed to e.g. SO_EE_ORIGIN_LOCAL, a locally-generated error).
+_SO_EE_ORIGIN_ICMP = 2
+_SO_EE_ORIGIN_ICMP6 = 3
+
+
+class UnprivilegedTracer(object):
+    """
+    UDP traceroute using IP_RECVERR/IPV6_RECVERR (Linux only), needing no raw
+    sockets and therefore no root.
+
+    Each probe sends from its own regular UDP socket with IP(V6)_RECVERR
+    enabled; the kernel then queues any resulting ICMP error (time exceeded,
+    or port/destination unreachable once we reach the target) on that same
+    socket's error queue, retrievable via recvmsg(..., MSG_ERRQUEUE). Because
+    each probe gets its answer back on its own socket, there is no need for
+    RawSocketTracer's shared listener thread / destination-port demuxing.
+    """
+
+    timeoutSec = 1
+
+    def __init__(self, dst, hops=30, quiet=False):
+        self.dst = dst
+        self.hops = hops
+        self.quiet = quiet
+
+    def trun(self) -> list:
+        """
+        Runs the tracer.
+        Raises:
+            IOError
+        """
+        try:
+            dst_ip = ipaddress.ip_address(self.dst)
+        except ValueError:
+            try:
+                dst_ip = ipaddress.ip_address(socket.gethostbyname(self.dst))
+            except socket.error as e:
+                raise IOError("Unable to resolve {}: {}".format(self.dst, e))
+
+        if not self.quiet:
+            print(
+                "traceroute to {} ({}), {} hops max".format(
+                    self.dst, dst_ip.exploded, self.hops
+                )
+            )
+
+        # dst-port only needs to be unique enough not to collide with a
+        # "real" listening service; unlike RawSocketTracer we don't need it
+        # to demux answers (each probe's own socket does that for us).
+        port = random.randint(__MINPORT__, __MAXPORT__)
+
+        hopAddrs = []
+        for ttl in range(1, self.hops + 1):
+            addr, rtt = self._probe(dst_ip, port, ttl)
+
+            if addr:
+                if not self.quiet:
+                    print("{:<4} {} {} ms".format(ttl, addr, rtt))
+                hopAddrs.append(addr)
+                if ipaddress.ip_address(addr) == dst_ip:
+                    break
+            else:
+                if not self.quiet:
+                    print("{:<4} *".format(ttl))
+                hopAddrs.append("*")
+
+        return hopAddrs
+
+    def _probe(self, dst_ip, port, ttl):
+        """
+        Sends a single UDP probe at the given ttl/hop-limit and waits for the
+        resulting ICMP error on the probe socket's own error queue.
+        Returns:
+            (addr, rtt_ms) of the router/host that answered, or (None, None)
+            on timeout.
+        """
+        if isinstance(dst_ip, ipaddress.IPv4Address):
+            family = socket.AF_INET
+            level = socket.SOL_IP
+            recverr_opt = socket.IP_RECVERR
+            ttl_opt = socket.IP_TTL
+            origin = _SO_EE_ORIGIN_ICMP
+        else:
+            family = socket.AF_INET6
+            level = socket.IPPROTO_IPV6
+            recverr_opt = socket.IPV6_RECVERR
+            ttl_opt = socket.IPV6_UNICAST_HOPS
+            origin = _SO_EE_ORIGIN_ICMP6
+
+        s = socket.socket(family, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        try:
+            s.setsockopt(level, recverr_opt, 1)
+            s.setsockopt(level, ttl_opt, ttl)
+            s.settimeout(self.timeoutSec)
+
+            start = time.time()
+            try:
+                s.sendto(b"", (dst_ip.compressed, port))
+            except OSError as e:
+                # some errors (e.g. immediate "no route") can be raised
+                # synchronously here rather than via the error queue
+                dprint("send error at ttl {:}: {:}".format(ttl, e))
+                return None, None
+
+            try:
+                _data, ancdata, _flags, _addr = s.recvmsg(
+                    512, 1024, socket.MSG_ERRQUEUE
+                )
+            except (socket.timeout, OSError):
+                return None, None
+
+            rtt = round((time.time() - start) * 1000, 2)
+
+            for cmsg_level, cmsg_type, cmsg_data in ancdata:
+                if cmsg_level == level and cmsg_type == recverr_opt:
+                    addr = self._parse_offender(family, origin, cmsg_data)
+                    if addr:
+                        return addr, rtt
+
+            return None, None
+        finally:
+            s.close()
+
+    @staticmethod
+    def _parse_offender(family, expected_origin, cmsg_data):
+        """
+        Parses the ancillary data delivered alongside IP(V6)_RECVERR: a
+        struct sock_extended_err (linux/errqueue.h) immediately followed by
+        the offending router/host's address as a sockaddr. Returns the
+        address as a string, or None if this isn't a real network-origin
+        ICMP error (or the offender is missing/malformed).
+        """
+        # struct sock_extended_err {
+        #     __u32 ee_errno; __u8 ee_origin; __u8 ee_type;
+        #     __u8 ee_code; __u8 ee_pad; __u32 ee_info; __u32 ee_data;
+        # };
+        if len(cmsg_data) <= 16:
+            return None
+
+        _errno, ee_origin, _type, _code, _pad, _info, _data = struct.unpack_from(
+            "=IBBBBII", cmsg_data, 0
+        )
+
+        if ee_origin != expected_origin:
+            # e.g. SO_EE_ORIGIN_LOCAL: a locally generated error, not a hop
+            return None
+
+        offender = cmsg_data[16:]
+
+        try:
+            if family == socket.AF_INET:
+                # struct sockaddr_in { u16 family; u16 port; u8 addr[4]; ... }
+                if len(offender) < 8:
+                    return None
+                return socket.inet_ntop(socket.AF_INET, offender[4:8])
+            else:
+                # struct sockaddr_in6 { u16 family; u16 port;
+                #                       u32 flowinfo; u8 addr[16]; u32 scope_id; }
+                if len(offender) < 24:
+                    return None
+                return socket.inet_ntop(socket.AF_INET6, offender[8:24])
+        except (struct.error, OSError, ValueError):
+            return None
+
+
+class RawSocketTracer(object):
 
     # class based lock, used for syncing with the listener which is class based.
     lock = threading.Lock()
@@ -266,26 +457,26 @@ class MyTracer(object):
         self.quiet = quiet
 
         # Loop for starting the listener
-        with MyTracer.lock:
-            if not MyTracer.listening:
+        with RawSocketTracer.lock:
+            if not RawSocketTracer.listening:
                 # important to use a THREADpool, and not a pool which is
                 # processes we don't want processes, period. Processes in
                 # Python are weird.
                 pool = ThreadPool(1)
                 # start it
-                pool.apply_async(MyTracer.listen)
+                pool.apply_async(RawSocketTracer.listen)
                 # set listening to true and then release the lock
-                MyTracer.listening = True
+                RawSocketTracer.listening = True
 
     def setPort(self):
         while True:
-            with MyTracer.lock:
+            with RawSocketTracer.lock:
                 # Pick up a random port in the range 33434-33534
                 # self.port = random.choice(range(33434, 33464))
                 self.port = random.choice(range(__MINPORT__, __MAXPORT__))
 
-                if self.port not in MyTracer.ports:
-                    MyTracer.ports.add(self.port)
+                if self.port not in RawSocketTracer.ports:
+                    RawSocketTracer.ports.add(self.port)
                     return
 
             # Sleep to avoid cpu thrashing
@@ -367,8 +558,6 @@ class MyTracer(object):
                     addr = addr[0]
 
                 except socket.error:
-                    ### We should try IPv6, but it doesn't work!
-                    ### IPv6 disabled at send for now
                     try:
                         # Jump to wait for next packet
                         # We probably didn't recieve anything and won't do it later
@@ -378,43 +567,28 @@ class MyTracer(object):
                         # We don't care about big packets. They are prolly not coming from us anyhow
                         data, addr = r6.recvfrom(1024)
 
-                        # Check that it is an ICMP package and its a 3 / 3 or 11 / 0
-                        #  i.e.
-                        # destination uncreachable / port unreachable
-                        # or
-                        # ttl exceeded / ttl exceeded in traffic
-                        # see https://tools.ietf.org/html/rfc4443 for details
-                        # That means (in an IP-packet sense) it has to be either
-                        # byte  8 == 58 (ICMPv6)
-                        # byte 40 ==  3 (destination unreachable)
-                        # byte 41 ==  3 (port unreachable)
-                        # or
-                        # byte  8 == 58 (ICMPv6)
-                        # byte 40 == 11 (time-to-live exceeded)
-                        # byte 41 ==  0 (ttl exceeded in traffic)
-                        if not data[8] == 58:
-                            # Not ICMP, don't really know what to do here, skip it?
-                            # lets skip it
-                            continue
-                        elif (
-                            not (data[40] == 3 and data[41] == 0)
-                            and not (data[40] == 3 and data[41] == 1)
-                            and not (data[40] == 1)
-                        ):
-                            # ICMP which is not 3/3-10-13 or 11/0
+                        # Check that it is an ICMPv6 message we care about:
+                        # destination unreachable (type 1) or time exceeded (type 3).
+                        # See https://tools.ietf.org/html/rfc4443 for details.
+                        #
+                        # Note: unlike raw IPv4 sockets, raw ICMPv6 sockets never
+                        # include the outer IPv6 header on receive (this is a
+                        # deliberate difference in the IPv6 raw socket API, see
+                        # RFC 3542) - the buffer starts directly with the 8-byte
+                        # ICMPv6 header, followed by the original packet that
+                        # triggered the error (inner IPv6 header + inner UDP
+                        # header). The destination port therefore ends up at the
+                        # *same* offset (50/51) as for IPv4: IPv4 raw sockets DO
+                        # include a 20-byte outer header (20 outer + 8 icmp +
+                        # 20 inner ip + 2 = 50), while IPv6 has no outer header
+                        # but a 40-byte inner header instead (8 icmp + 40 inner
+                        # ip + 2 = 50).
+                        if data[0] not in (1, 3):
+                            # not destination-unreachable / time-exceeded, skip it
                             continue
 
                         # Here we know its ICMP *and* useful
-
-                        # Get the port from the data
-                        # Normally the port for the request will be in
-                        # position 50+51 (if only counting IP-packet bytes)
-                        # or position 64+65 if counting the entire eth-frame
-                        # we reduce dependencies by only looking at the ip-frame
-                        # as a buffer of bytes rather than importing packages for
-                        # parsing IP-packets and ETH-frames
-                        # moved for icmpv6 (+40)
-                        localport = data[90] * 256 + data[91]
+                        localport = data[50] * 256 + data[51]
                         endTimer = time.time()
                         # get the host from addr (i.e. addr[0], addr[1] is port which is 0 for ICMP)
                         addr = addr[0]
@@ -500,8 +674,8 @@ class MyTracer(object):
         # creaty the query object we will but in the running queries
         # dictionary. Using the class based lock
         myQuery = Query(self.port)
-        with MyTracer.lock:
-            MyTracer.runningQueries[self.port] = myQuery
+        with RawSocketTracer.lock:
+            RawSocketTracer.runningQueries[self.port] = myQuery
 
         while True:
             myQuery.startTimer = time.time()
@@ -518,9 +692,9 @@ class MyTracer(object):
                 raise IOError("MyTrace Unable to send {}: {}", dst_ip.compressed, e)
 
             # signal that something is ready
-            MyTracer.recieveSema.release()
+            RawSocketTracer.recieveSema.release()
             # wait for the result
-            if not myQuery.sema.acquire(timeout=MyTracer.timeoutSec):
+            if not myQuery.sema.acquire(timeout=RawSocketTracer.timeoutSec):
                 # we did not get a response
                 with myQuery.lock:
                     myQuery.hops.append(Hop("*", None))
@@ -551,11 +725,11 @@ class MyTracer(object):
                 # we have gone to far, abort!
                 break
 
-        with MyTracer.lock:
+        with RawSocketTracer.lock:
             # Clean up our used port, both from the set and our collection of ongoing queries
             try:
-                del MyTracer.runningQueries[self.port]
-                MyTracer.ports.remove(self.port)
+                del RawSocketTracer.runningQueries[self.port]
+                RawSocketTracer.ports.remove(self.port)
             except:
                 print("Got unknown error when cleaning up")
 
@@ -578,7 +752,7 @@ class MyTracer(object):
             family=socket.AF_INET, type=socket.SOCK_RAW, proto=socket.IPPROTO_ICMP
         )
 
-        timeout = struct.pack("ll", MyTracer.timeoutSec, 0)
+        timeout = struct.pack("ll", RawSocketTracer.timeoutSec, 0)
         s4.setsockopt(socket.SOL_SOCKET, socket.SO_RCVTIMEO, timeout)
 
         try:
@@ -596,7 +770,7 @@ class MyTracer(object):
             family=socket.AF_INET6, type=socket.SOCK_RAW, proto=socket.IPPROTO_ICMPV6
         )
 
-        timeout = struct.pack("ll", MyTracer.timeoutSec, 0)
+        timeout = struct.pack("ll", RawSocketTracer.timeoutSec, 0)
         s6.setsockopt(socket.SOL_SOCKET, socket.SO_RCVTIMEO, timeout)
 
         try:

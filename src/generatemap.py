@@ -77,6 +77,16 @@ def main(arg=None):
     else:
         args = parser.parse_args()
 
+    ## Tracing needs raw sockets on most platforms (i.e. root), but not on
+    ## Linux, which can trace via IP_RECVERR/IPV6_RECVERR instead. Checking
+    ## (and elevating) only now, after argparse has run, also means --help
+    ## and bad-argument errors don't needlessly prompt for a password.
+    if parallelltracert.requires_root() and not is_root():
+        print("Tracing will require root, trying to elevate")
+        print("[If you do not trust this application, do not continue]")
+        elevate(show_console=False, graphical=False)
+        print("Elevated, restarting application as root")
+
     ## start the program
     hosts = []
 
@@ -252,15 +262,7 @@ def is_root():
 
 
 if __name__ == "__main__":
-
-    if not is_root():
-        # check for root and elevate
-        print("Tracing will require root, trying to elevate")
-        print("[If you do not trust this application, do not continue]")
-        elevate(show_console=False, graphical=False)
-        print("Elevated, restarting application as root")
-
-    ## call main
+    ## call main (elevates internally, only if/once actually needed - see main())
     main()
 else:
     # We are supposed to run as a script, for now just exit to avoid weird
