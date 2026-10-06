@@ -6,3 +6,6 @@
 
 ## generated pngs
 src/examplehars/*.png
+
+*.pdf
+**/*.pdf

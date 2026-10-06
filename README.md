@@ -16,18 +16,19 @@ And a word of warning, this repository exists to show code used in my thesis, no
 
 
 If you use this in your research, please cite (if possible):
-- Lindeberg, Fredrik. “Coordinating the Internet.” Licentiate Thesis, Linköping University, 2019. http://urn.kb.se/resolve?urn=urn:nbn:se:liu:diva-161812.
+- Lindeberg, Fredrik. “Coordinating the Internet: Thought Styles, Technology and Coordination.” PhD of Technology, Linköping University, 2021. http://urn.kb.se/resolve?urn=urn:nbn:se:liu:diva-173713
 
 bibtex:
 ```
-@thesis{Lindeberg2019,
-  title = {Coordinating the {{Internet}}},
+@thesis{LindebergCoordinating2021,
+  title = {Coordinating the {{Internet}}: {{Thought}} Styles, Technology and Coordination},
+  shorttitle = {Coordinating the {{Internet}}},
   author = {Lindeberg, Fredrik},
-  date = {2019},
-  institution = {{Linköping University}},
+  date = {2021},
+  institution = {{Link\"oping University}},
   url = {http://urn.kb.se/resolve?urn=urn:nbn:se:liu:diva-161812},
-  pagetotal = {383},
-  type = {Licentiate Thesis}
+  langid = {english},
+  type = {PhD of Technology}
 }
 ```
 

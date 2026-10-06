@@ -128,7 +128,7 @@ class ASFind:
 
     @property
     def CIDRs(self):
-        """ Returns CIDRs represented by this object """
+        """Returns CIDRs represented by this object"""
         return self._CIDRs
 
     @property
@@ -150,16 +150,16 @@ class ASFind:
         return None
 
     def addIPrange(self, start: ipaddress._BaseAddress, end: ipaddress._BaseAddress):
-        """ Adds a new IP range to the CIDR collection """
+        """Adds a new IP range to the CIDR collection"""
         self._CIDRs.extend(ipaddress.summarize_address_range(start, end))
 
     def addCIDRs(self, cidrs: List[ipaddress._BaseNetwork]):
-        """ Adds more CIDRs to the CIDR collection """
+        """Adds more CIDRs to the CIDR collection"""
         self._CIDRs.extend(cidrs)
 
 
 class ASNLookup:
-    """ Class for looking up ASN data """
+    """Class for looking up ASN data"""
 
     # currently based on pyasn, and has to be. They have the correct data
     __p = pyasn.pyasn("pyasn.dat", "pyasn.json")
@@ -181,7 +181,7 @@ class ASNLookup:
         self._asinfo = AsInfo()
 
     def lookupmanystr(self, ips: List[str]) -> AsInfo:
-        """ Looks up AsInfo from a list of IP-addresses in string-type """
+        """Looks up AsInfo from a list of IP-addresses in string-type"""
         ipstyped = list()
         for ip in set(ips):  ## remove duplicates
             try:
@@ -194,7 +194,7 @@ class ASNLookup:
         return self.lookupmany(ipstyped)
 
     def lookupmany(self, ips: List[ipaddress.IPv4Address]) -> AsInfo:
-        """ Looks up AsInfo from a list of IP-addresses ipaddress.IPv4Address-type """
+        """Looks up AsInfo from a list of IP-addresses ipaddress.IPv4Address-type"""
 
         # Our presumed object
         # use instance variable for now
@@ -451,7 +451,7 @@ class ASNLookup:
         return asinfo
 
     def clean(self):
-        """ Cleans the instance AS and adds companies were applicble """
+        """Cleans the instance AS and adds companies were applicble"""
 
         # HACK Use fixed list for companies for now
         # TODO Use a smart list of companies?

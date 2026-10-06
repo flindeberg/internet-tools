@@ -66,7 +66,7 @@ class HarHost:
         )  # start with assuming that the trace is missing
 
     def setASNLookup(self, lookup: asnutils.ASNLookup):
-        """ Force a specific ASNLookup for this HarHost (could be useful for speed) """
+        """Force a specific ASNLookup for this HarHost (could be useful for speed)"""
         self._asnlookup = lookup
 
     @property
@@ -152,7 +152,7 @@ class HarHost:
             ## put it in the list, that way we still keep it even though we could not resolve it
 
     def getToTrace(self):
-        """ Helper func for future refactoring """
+        """Helper func for future refactoring"""
         return self.ips
 
     def trace(self):
@@ -189,7 +189,13 @@ class HarHost:
 
             filtered = list(filter(lambda x: x != "*", traces[key]))
             iplist = list(ipaddress.ip_address(x) for x in filtered)
+            ## Set the resolves ip last of the trace times out, this ensures proper AS match
+            if iplist[-1] != ipaddress.ip_address(key):
+                iplist.append(ipaddress.ip_address(key))
+                print("Added {:} last to {:}".format(ipaddress.ip_address(key), ipaddress.ip_address(key)))
+            
             self._ipstrace[ipaddress.ip_address(key)] = iplist
+
             ## Set the trace status, will be used for coloring later
             self._trace = edgeutils.TraceType.getTraceStatus(traces[key])
 
@@ -236,50 +242,56 @@ class HarHost:
             current: AS
             for current in ips:
                 # current is here an AS
-                country = pycountry.countries.get(alpha_2=current.cc)
+                try:
+                    country = pycountry.countries.get(alpha_2=current.cc)
 
-                # use lastNode, as well as the current one
-                # current is ASN, lastNode might be "localhost" or ASN
-                # doublecheck that we are not referencing ourselves
-                if lastNode[0] != current.GetPrettyName():
-                    edges.append(
-                        EdgeTuple(
-                            lastNode[0],
-                            current.GetPrettyName(),
-                            lastNode[1],
-                            EdgeType.asn,
-                            lastNode[1],
-                            data=self.size,
+                    # use lastNode, as well as the current one
+                    # current is ASN, lastNode might be "localhost" or ASN
+                    # doublecheck that we are not referencing ourselves
+                    if lastNode[0] != current.GetPrettyName():
+                        edges.append(
+                            EdgeTuple(
+                                lastNode[0],
+                                current.GetPrettyName(),
+                                lastNode[1],
+                                EdgeType.asn,
+                                lastNode[1],
+                                data=self.size,
+                            )
                         )
-                    )
 
-                if country is not None:  # only add countries which exist
-                    # add country connection as well
-                    edges.append(
-                        EdgeTuple(
-                            country.name,
-                            current.GetPrettyName(),
-                            EdgeType.cc,
-                            EdgeType.asn,
-                            EdgeType.cc,
-                            data=current.asn,
+                    if country is not None:  # only add countries which exist
+                        # add country connection as well
+                        edges.append(
+                            EdgeTuple(
+                                country.name,
+                                current.GetPrettyName(),
+                                EdgeType.cc,
+                                EdgeType.asn,
+                                EdgeType.cc,
+                                data=current.asn,
+                            )
                         )
-                    )
 
-                # Handle company if present
-                if current.company is not None:
-                    edges.append(
-                        EdgeTuple(
-                            current.company,
-                            current.GetPrettyName(),
-                            EdgeType.company,
-                            EdgeType.asn,
-                            EdgeType.company,
+                    # Handle company if present
+                    if current.company is not None:
+                        edges.append(
+                            EdgeTuple(
+                                current.company,
+                                current.GetPrettyName(),
+                                EdgeType.company,
+                                EdgeType.asn,
+                                EdgeType.company,
+                            )
                         )
-                    )
 
-                # prepare for next round
-                lastNode = (current.GetPrettyName(), EdgeType.asn)
+                    # prepare for next round
+                    lastNode = (current.GetPrettyName(), EdgeType.asn)
+                except LookupError as e:
+                    ## Something else is fishy
+                    print("Not an country, skipping: '{:}' ({:})".format(current.cc, e))
+                except:
+                    print("Unexpected error:", sys.exc_info())
 
             # If we have a full trace its a "host", else its an
             # "indirect host" (i.e. ihost)
@@ -312,7 +324,7 @@ HostDict = Dict[ipaddress._BaseAddress, HarHost]
 
 
 class HarResult:
-    """ Class for storing data from har request """
+    """Class for storing data from har request"""
 
     def __init__(self, file):
         # Do nothing!
@@ -530,22 +542,22 @@ class CheckHAR:
         )
 
         with open(file) as json_data:
-            d = json.load(json_data)
+            d: dict = json.load(json_data)
 
             self.result.requests = len(d["log"]["entries"])
 
             if len(d["log"]["pages"]) > 0:
                 self.result.start = d["log"]["pages"][0]["startedDateTime"]
 
+            entry :dict
             for entry in d["log"]["entries"]:
-
+                
                 parsedhost = urlutils.GetHostFromString(entry["request"]["url"])
-
                 realsize = (
-                    entry["request"]["headersSize"]
-                    + entry["request"]["bodySize"]
-                    + entry["response"]["headersSize"]
-                    + entry["response"]["bodySize"]
+                    (entry["request"].get("headersSize", 0) or 0)
+                    + (entry["request"].get("bodySize", 0) or 0)
+                    + (entry["response"].get("headersSize", 0) or 0)
+                    + (entry["response"].get("bodySize", 0) or 0)
                 )
                 if "_transferSize" in entry["response"]:
                     transfersize = entry["response"]["_transferSize"]
@@ -572,7 +584,7 @@ class CheckHAR:
             print("Parser loaded, {:} hosts in total".format(len(self.result.hosts)))
 
     def cook(self):
-        """ Cooks the the Har so we can get the edges. Has to be called prior to getEdges """
+        """Cooks the the Har so we can get the edges. Has to be called prior to getEdges"""
 
         # type hint them, we are reusing them
         key: str
