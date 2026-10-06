@@ -9,6 +9,8 @@ pycountry
 elevate
 pandas
 cleanco
-string_grouper
+scikit-learn
+scipy
+sparse_dot_topn>=1.0
 pygraphviz
 requests
