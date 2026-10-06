@@ -21,7 +21,6 @@ import parallelltracert
 from harutilities import urlutils
 from urllib.parse import urlparse
 
-
 """
  Module for generating graphs of website dependencies. Useful for illustrating
  the complexity of the Internet by showing how the web# uses the Internet.

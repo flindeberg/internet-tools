@@ -8,7 +8,6 @@ from typing import Tuple, NamedTuple, List, Optional
 from sparse_dot_topn import awesome_cossim_topn
 from functools import wraps
 
-
 DEFAULT_NGRAM_SIZE: int = 3
 DEFAULT_REGEX: str = r"[,-./]|\s"
 DEFAULT_MAX_N_MATCHES: int = 20
@@ -336,9 +335,9 @@ class StringGrouper(object):
             )
             # update the old ones
             rows_to_update = ~new_grouped_id_tuples.group_id_new.isnull()
-            new_grouped_id_tuples.loc[
-                rows_to_update, "group_id"
-            ] = new_grouped_id_tuples[rows_to_update].group_id_new
+            new_grouped_id_tuples.loc[rows_to_update, "group_id"] = (
+                new_grouped_id_tuples[rows_to_update].group_id_new
+            )
             grouped_id_tuples = new_grouped_id_tuples[
                 ["original_id", "group_id", "min_similarity"]
             ].copy()

@@ -15,7 +15,6 @@ import cleanco
 import pandas as pd
 from string_grouper import match_most_similar
 
-
 ## TLS adapted for workaround
 import requests
 from requests import adapters
