@@ -40,7 +40,7 @@ jobs:
         cd src
         python generatemap.py -w www.dn.se www.svd.se -o newssites
     - name: Upload graph image
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: Upload graph
         path: src/newssites/
