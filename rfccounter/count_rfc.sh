@@ -3,6 +3,9 @@
 # run from the script's folder, regardless of where we are called from
 cd "$(dirname "$0")" || exit 1
 
+# byte-wise text handling, so GNU grep does not treat RFCs with non-UTF-8 bytes as binary
+export LC_ALL=C
+
 # set folder
 rfcs=rfcs
 
@@ -37,7 +40,7 @@ function get_rfc_filenames {
 
 # prints "lines words" for non-empty lines of the files on stdin
 function count_lines_words {
-    xargs cat | grep -v '^[[:space:]]*$' | wc -lw | awk '{ print $1, $2 }'
+    xargs cat | grep -av '^[[:space:]]*$' | wc -lw | awk '{ print $1, $2 }'
 }
 
 # prints size in MiB (rounded) of the files on stdin

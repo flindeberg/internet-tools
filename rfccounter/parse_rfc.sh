@@ -4,6 +4,9 @@
 # run from the script's folder, regardless of where we are called from
 cd "$(dirname "$0")" || exit 1
 
+# byte-wise text handling, so GNU grep does not treat RFCs with non-UTF-8 bytes as binary
+export LC_ALL=C
+
 # set folder
 rfcs=rfcs
 
@@ -19,7 +22,7 @@ fi
 # get the domain of every address on an 'email:' line, one per line, lowercased
 # keeps three labels for two-letter ccTLDs with a generic second level, e.g. ox.ac.uk, bt.co.uk
 function domains {
-    ls ${rfcs}/rfc[0-9]*.txt | xargs grep -hi 'e-\{0,1\}mail:' \
+    ls ${rfcs}/rfc[0-9]*.txt | xargs grep -ahi 'e-\{0,1\}mail:' \
         | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' \
         | sed 's/.*@//' | tr 'A-Z' 'a-z' \
         | awk -F. '{
