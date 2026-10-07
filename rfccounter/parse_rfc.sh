@@ -1,59 +1,110 @@
 #!/usr/bin/env zsh
 # prefer zsh
 
-grep=grep # start with normal grep on path
+# run from the script's folder, regardless of where we are called from
+cd "$(dirname "$0")" || exit 1
 
-# if we have ggrep (gnu-version), lets use it
-if hash ggrep 2>/dev/null; then
-	grep=ggrep
-fi
+# byte-wise text handling, so GNU grep does not treat RFCs with non-UTF-8 bytes as binary
+export LC_ALL=C
 
 # set folder
 rfcs=rfcs
 
-echo "rsyncing text versions of rfcs (and int stds)"
-rsync -avz --delete ftp.rfc-editor.org::rfcs-text-only ${rfcs}
+# number of rows in the domain tables
+top=8
 
+# set SKIP_SYNC=1 to reuse an existing copy
+if [ -z "${SKIP_SYNC:-}" ]; then
+    echo "rsyncing text versions of rfcs (and int stds)"
+    rsync -avz --delete ftp.rfc-editor.org::rfcs-text-only ${rfcs} || exit 1
+fi
 
-# get all rows conforming to 'email: "an address"' and get the domain and tld
-# currently doesn't work well with dual "tlds", like co.uk, but they are so few they don't matter for now
+# get the domain of every address on an 'email:' line, one per line, lowercased
+# keeps three labels for two-letter ccTLDs with a generic second level, e.g. ox.ac.uk, bt.co.uk
+function domains {
+    ls ${rfcs}/rfc[0-9]*.txt | xargs grep -ahi 'e-\{0,1\}mail:' \
+        | grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' \
+        | sed 's/.*@//' | tr 'A-Z' 'a-z' \
+        | awk -F. '{
+            n = NF
+            if (n >= 3 && length($n) == 2 && $(n-1) ~ /^(co|ac|com|net|org|edu|gov|ne|or)$/)
+                print $(n-2) "." $(n-1) "." $n
+            else
+                print $(n-1) "." $n
+        }'
+}
 
-echo "grepping for emails to top8.txt"
-${grep} -i 'email:' ${rfcs}/*.txt | sed -E 's/[\"><]//' | sed -E 's/.*[.@]([A-Za-z0-9-]+\.[A-Za-z0-9]*$)/\1/' | ${grep} -vP 'rfc\d.*txt' | sort | uniq -c | sort -nr | head -n 9 | awk '{ print $1, "&", $2, "\\\\" }' > top8.txt
+# "count domain" -> "count & domain \\"
+function to_latex {
+    awk '{ print $1, "&", $2, "\\\\" }'
+}
 
-echo "grepping for top universities (assuming .edu)"
-${grep} -i "email" ${rfcs}/*.txt | sed -E 's/["><]//' | sed -E 's/.*[.@]([A-Za-z0-9-]+\.[A-Za-z0-9]*$)/\1/' | ${grep} -vP "rfc\d.*txt" | ${grep} "\.edu" | sort | uniq -c | sort -rn | head -n 8 | awk '{ print $1, "&", $2, "\\\\" }' > top_uni.txt
+# merge two latex tables side by side, padding the shorter one
+function two_col {
+    awk 'NR == FNR { a[FNR] = $0; na = FNR; next }
+         { b[FNR] = $0; nb = FNR }
+         END {
+             n = na > nb ? na : nb
+             for (i = 1; i <= n; i++) {
+                 l = (i in a) ? a[i] : "& \\\\"
+                 r = (i in b) ? b[i] : "& \\\\"
+                 sub(/ *\\\\$/, " \\&", l)
+                 print l, r
+             }
+         }' $1 $2
+}
 
-# above is naive, lets be smarter
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/parse_rfc.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT
 
-echo "grepping for fixed set of orgs"
+echo "extracting email domains"
+domains | sort | uniq -c | sort -nr > $tmp/domains
 
-file=top_orgs.txt
+echo "top domains to top8.txt"
+head -n $top $tmp/domains | to_latex > top8.txt
 
-[ -f "$file" ] && rm "$file"
+echo "top universities (assuming .edu) to top_uni.txt"
+grep '\.edu$' $tmp/domains | head -n $top | to_latex > top_uni.txt
 
-## Some organizations and different names for them, usus the standard grep format, i.e. "|" as "or"
-for str in "Cisco" "Ericsson" "Huawei" "Juniper" "Microsoft\|msft\|\.ms" "Nokia" "IBM" "ATT" "MIT" "Google" "Yahoo" "IEEE" "Intel" "Qualcomm" "Apple" "ICANN" "Harvard" "Facebook\|fb.com" "Amazon\|aws" 
-do
-    res=$(${grep} -i "email" ${rfcs}/*.txt | sed -E 's/["><]//' | sed -E 's/.*[.@]([A-Za-z0-9-]+\.[A-Za-z0-9]*$)/\1/' | ${grep} -vP "rfc\d.*txt" | ${grep} -i $str | wc -l)
-    cmp=$(echo $str | perl -pe 's/(.*?)(\\..*)/\1/')
-    echo $res $cmp | awk '{ print $1, "&", $2, "\\\\" }' >> $file
-done
+echo "fixed set of orgs to top_orgs.txt"
 
-# sort files
-sort -nr $file -o $file
+## Organizations as "Name:regex", the regex is matched (extended, anchored) against the domain
+orgs=(
+    "Cisco:cisco"
+    "Ericsson:ericsson"
+    "Huawei:huawei"
+    "Juniper:juniper"
+    "Microsoft:microsoft|msft"
+    "Nokia:nokia|nokia-bell-labs"
+    "IBM:ibm"
+    "ATT:att"
+    "MIT:mit"
+    "Google:google"
+    "Yahoo:yahoo|yahoo-inc"
+    "IEEE:ieee"
+    "Intel:intel"
+    "Qualcomm:qualcomm"
+    "Apple:apple"
+    "ICANN:icann"
+    "Harvard:harvard"
+    "Facebook:facebook|fb"
+    "Amazon:amazon|aws"
+)
 
-line=$(echo "($(wc -l top_orgs.txt | cut -f1 -d' ') + 1) / 2 + 1" | bc)
+for org in "${orgs[@]}"; do
+    name=${org%%:*}
+    re=${org#*:}
+    awk -v re="^($re)\\\\." -v name="$name" '$2 ~ re { s += $1 } END { print s + 0, name }' $tmp/domains
+done | sort -nr | to_latex > top_orgs.txt
 
-[ -f "tmp_*" ] && rm "tmp_*"
-
-csplit -sf tmp_ $file $line
-paste -d "-" tmp_0* | sed 's/\\\\-/\& /g' > top_orgs_2col.txt
-
-rm tmp_*
+# split the orgs in two halves and put them side by side
+half=$(( ($(wc -l < top_orgs.txt) + 1) / 2 ))
+head -n $half top_orgs.txt > $tmp/left
+tail -n +$((half + 1)) top_orgs.txt > $tmp/right
+two_col $tmp/left $tmp/right > top_orgs_2col.txt
 
 echo "merged to two col format for top orgs"
 
-paste -d "-" top8.txt top_uni.txt | sed 's/\\\\-/\& /g' > top_domains_2col.txt
+two_col top8.txt top_uni.txt > top_domains_2col.txt
 
 echo "merged to two col format for domains"

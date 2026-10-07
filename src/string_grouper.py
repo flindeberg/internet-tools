@@ -3,11 +3,10 @@ import numpy as np
 import re
 import multiprocessing
 from sklearn.feature_extraction.text import TfidfVectorizer
-from scipy.sparse.csr import csr_matrix
+from scipy.sparse import csr_matrix
 from typing import Tuple, NamedTuple, List, Optional
-from sparse_dot_topn import awesome_cossim_topn
+from sparse_dot_topn import sp_matmul_topn
 from functools import wraps
-
 
 DEFAULT_NGRAM_SIZE: int = 3
 DEFAULT_REGEX: str = r"[,-./]|\s"
@@ -79,7 +78,7 @@ class StringGrouperConfig(NamedTuple):
     Class with configuration variables
 
     :param ngram_size: int. The amount of characters in each n-gram. Optional. Default is 3
-    :param regex: str. The regex string used to cleanup the input string. Optional. Default is [,-./]|\s
+    :param regex: str. The regex string used to cleanup the input string. Optional. Default is [,-./]|\\s
     :param max_n_matches: int. The maximum number of matches allowed per string. Default is 20
     :param min_similarity: float. The minium cossine similarity for two strings to be considered a match.
     Defaults to 0.8
@@ -273,19 +272,17 @@ class StringGrouper(object):
         tf_idf_matrix_1 = master_matrix
         tf_idf_matrix_2 = duplicate_matrix.transpose()
 
-        optional_kwargs = dict()
+        n_threads = None
         if self._config.number_of_processes > 1:
-            optional_kwargs = {
-                "use_threads": True,
-                "n_jobs": self._config.number_of_processes,
-            }
+            n_threads = self._config.number_of_processes
 
-        return awesome_cossim_topn(
+        return sp_matmul_topn(
             tf_idf_matrix_1,
             tf_idf_matrix_2,
-            self._config.max_n_matches,
-            self._config.min_similarity,
-            **optional_kwargs,
+            top_n=self._config.max_n_matches,
+            threshold=self._config.min_similarity,
+            sort=True,
+            n_threads=n_threads,
         )
 
     @staticmethod
@@ -336,9 +333,9 @@ class StringGrouper(object):
             )
             # update the old ones
             rows_to_update = ~new_grouped_id_tuples.group_id_new.isnull()
-            new_grouped_id_tuples.loc[
-                rows_to_update, "group_id"
-            ] = new_grouped_id_tuples[rows_to_update].group_id_new
+            new_grouped_id_tuples.loc[rows_to_update, "group_id"] = (
+                new_grouped_id_tuples[rows_to_update].group_id_new
+            )
             grouped_id_tuples = new_grouped_id_tuples[
                 ["original_id", "group_id", "min_similarity"]
             ].copy()
