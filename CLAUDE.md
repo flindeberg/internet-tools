@@ -16,7 +16,7 @@ The pipeline (`generatemap.py` → `CheckHAR.Load()` → `CheckHAR.cook()` → `
 - `src/edgeutils.py`, `src/internetgraph.py`: edges, and drawing with networkx + Graphviz `neato` (png + svg).
 - `tests/`: offline tests (packet parsing, hop logic, routing-data selection).
 
-Not part of the pipeline: `rfccounter/` (RFC statistics, its own CI workflow), `zoneyoga/` (AS statistics of name servers in zone files), `pdfs/` (ICANN PDF scraper). Unused leftovers: `src/pyasn_old.*`, `src/testpyppeeteer.py`. `src/string_grouper.py` is a modified copy of the PyPI package of that name, which must not be installed as well.
+Not part of the pipeline: `rfccounter/` (RFC statistics, its own CI workflow), `zoneyoga/` (AS statistics of name servers in zone files), `pdfs/` (ICANN PDF scraper). `src/string_grouper.py` is a modified copy of the PyPI package of that name, which must not be installed as well.
 
 ## Setup, run, test
 

@@ -25,7 +25,7 @@ jobs:
     - name: Install python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 pytest
+        pip install pytest
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     # the runner image already has Google Chrome and Node.js
     - name: Install chrome-har-capturer
