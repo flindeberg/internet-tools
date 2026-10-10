@@ -9,3 +9,6 @@ src/examplehars/*.png
 
 *.pdf
 **/*.pdf
+## generated routing data for pyasn (see src/updatepyasnfiles.sh)
+src/pyasn_local.dat
+src/pyasn_local.json

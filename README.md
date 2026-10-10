@@ -82,11 +82,17 @@ See `src/` directory, and in particular `generatemap.py`, `parallelltracert.py`,
 
 ### Command line tools
 
-The most interesting tool to use quickly is the `generate_map.py`, which generates a map / graph from either a list of urls or a set of har-files. Due to the nature of the traceroute (modifying packets at low level) root-acccess is required. On most systems this can be attained with `sudo`. This meanst that *you* should make sure that you understand what the Python-script does before running it).
+The most interesting tool to use quickly is the `generate_map.py`, which generates a map / graph from either a list of urls or a set of har-files. Run it from the `src/` directory.
+
+On Linux and macOS the traceroute runs without root (Linux reads the ICMP errors off the UDP sockets' error queues, macOS uses unprivileged ICMP datagram sockets). On other systems it needs raw sockets, i.e. root, and `generatemap.py` will ask to elevate with `sudo`. This means that *you* should make sure that you understand what the Python-script does before running it.
+
+IPv6 is traced as well with `-6`.
+
+The AS-lookup uses routing data (IPv4 and IPv6) for `pyasn`. `src/pyasn.dat` / `pyasn.json` is a snapshot kept in git; `generatemap.py` generates newer data locally (`pyasn_local.dat` / `.json`, not in git, ~100 MB download) when what it has is older than 7 days, and uses whichever is newest. Change the age with `--asn-max-age DAYS` (negative: never update). To update by hand, run `./updatepyasnfiles.sh`; `./updatepyasnfiles.sh pyasn` updates the snapshot in git instead.
 
 Some example usages:
 
-    ## Generatemap will always ask for priv-escalation unless found
+    ## Generatemap asks for priv-escalation only where tracing needs root
 
     ## Visit New York Times and CNN, and then show the graph (-w for website)
     python3 generatemap.py -w www.nytimes.com www.cnn.com
@@ -96,5 +102,8 @@ Some example usages:
     
     ## Draw separate graphs based on urls quietly (-s or --separate to do individual runs, -q or --quiet for no output)
     python3 generatemap.py -s -q -w thesun.co.uk nytimes.com cnn.com -o testingsep
+
+    ## Trace both IPv4 and IPv6 (-6 or --ipv6)
+    python3 generatemap.py -6 -w www.netnod.se www.dn.se
     
 

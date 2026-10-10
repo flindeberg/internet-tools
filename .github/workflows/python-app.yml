@@ -30,6 +30,15 @@ jobs:
     # the runner image already has Google Chrome and Node.js
     - name: Install chrome-har-capturer
       run: sudo npm install --global chrome-har-capturer
+    - name: Run tests
+      run: |
+        cd src
+        python -m pytest -q ../tests
+    # shows the hops, and that tracing works without root (as the runner user)
+    - name: Trace without root
+      run: |
+        cd src
+        python parallelltracert.py
     - name: Prepare pyasn with fresh data
       run: |
         cd src

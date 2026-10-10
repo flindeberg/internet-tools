@@ -43,15 +43,20 @@ fi
 # ensure that we have the folder
 mkdir -p $folder
 
-flags="--remote-debugging-port=9222 --no-sandbox --headless --content --disable-gpu --download-whole-document --deterministic-fetch --disk-cache-size=0 --net-log-capture-mode=IncludeCookiesAndCredentials"
+## isolated profile dir, otherwise Chrome's single-instance behaviour forwards
+## these flags to an already-running (non-headless) Chrome instance and silently
+## ignores --headless / --remote-debugging-port
+flags="--remote-debugging-port=9222 --no-sandbox --headless --content --disable-gpu --download-whole-document --deterministic-fetch --disk-cache-size=0 --net-log-capture-mode=IncludeCookiesAndCredentials --user-data-dir=$folder/chrome-profile"
+read -ra flagsarr <<< "$flags"
 
 # start chrome if not running
 if ! (pgrep -f ".*$flags" > /dev/null) ; then
     echo "Starting headless browser ($browser)"
 
     ## --no-sandbox required for linux and root
-    echo "Starting '${browser} $flags'"
-    "$browser" $flags 2> "$folder/chrome_errors.log" &
+    ## use an array so browser paths containing spaces (e.g. macOS "Google Chrome.app") work
+    echo "Starting '$browser' with flags '$flags'"
+    "$browser" "${flagsarr[@]}" 2> "$folder/chrome_errors.log" &
 
     ## wait (max 20 s) for the debugging port, instead of hoping a fixed sleep is enough
     for _ in $(seq 40); do

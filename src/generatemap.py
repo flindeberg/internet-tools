@@ -1,4 +1,4 @@
-#!/bin/env python3
+#!/usr/bin/env python3
 
 # Copyright (c) 2019, 2020 Fredrik Lindeberg <flindeberg@gmail.com>
 # All rights reserved.
@@ -11,10 +11,11 @@ import tempfile
 from pathlib import Path
 from shutil import copyfile
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from elevate import elevate
 
+import asnutils
 import harutilities
 import internetgraph
 import parallelltracert
@@ -68,13 +69,49 @@ def main(arg=None):
         "--ports",
         type=int,
         default=30,
-        help="number of ports used for tracing (defaults to 30)",
+        help="number of ports used for tracing, i.e. traces running in parallel (defaults to 30)",
+    )
+
+    parser.add_argument(
+        "-6",
+        "--ipv6",
+        action="store_true",
+        help="also resolve and trace ipv6 (aaaa) addresses, not only ipv4",
+    )
+
+    parser.add_argument(
+        "--asn-max-age",
+        type=int,
+        default=7,
+        metavar="DAYS",
+        help="generate new routing data for the AS-lookup (~100 MB download) "
+        "if what we have is older than this (defaults to 7, negative: never)",
     )
 
     if arg is not None:
         args = parser.parse_args(arg)
     else:
         args = parser.parse_args()
+
+    ## Tracing needs raw sockets on most platforms (i.e. root), but not on
+    ## Linux and macOS, which can trace without (see parallelltracert).
+    ## Checking (and elevating) only now, after argparse has run, also means
+    ## --help and bad-argument errors don't needlessly prompt for a password.
+    if parallelltracert.requires_root() and not is_root():
+        print("Tracing will require root, trying to elevate")
+        print("[If you do not trust this application, do not continue]")
+        elevate(show_console=False, graphical=False)
+        print("Elevated, restarting application as root")
+
+    if args.asn_max_age >= 0:
+        asnutils.ensure_fresh_pyasn_data(timedelta(days=args.asn_max_age))
+
+    if args.ipv6 and not asnutils.ASNLookup.has_ipv6_data():
+        print(
+            "Warning: the routing data has no ipv6 routes, so ipv6-addresses "
+            "will be looked up one by one via RDAP (slow). Run "
+            "./updatepyasnfiles.sh to get current ipv4 and ipv6 routes."
+        )
 
     ## start the program
     hosts = []
@@ -110,9 +147,9 @@ def main(arg=None):
         hostslist = [hosts]
 
     # Setup tracer
-    if args.ports < 0:
-        print("Cannot use negative number of ports, defaulting to 30")
-        args.ports = 100
+    if args.ports < 1:
+        print("Need at least one port, defaulting to 30")
+        args.ports = 30
 
     # set nr of ports
     parallelltracert.TraceManager.SetPorts(args.ports)
@@ -128,7 +165,7 @@ def main(arg=None):
 
             ## Now we should have the harname, regardless of how we got it
             ## Lets analyze the har
-            harchecker = harutilities.CheckHAR()
+            harchecker = harutilities.CheckHAR(ipv6=args.ipv6)
             harchecker.Load(fullharname)
 
             ## Prepare the har, i.e. resolve hosts, trace hosts and resolve
@@ -251,15 +288,7 @@ def is_root():
 
 
 if __name__ == "__main__":
-
-    if not is_root():
-        # check for root and elevate
-        print("Tracing will require root, trying to elevate")
-        print("[If you do not trust this application, do not continue]")
-        elevate(show_console=False, graphical=False)
-        print("Elevated, restarting application as root")
-
-    ## call main
+    ## call main (elevates internally, only if/once actually needed - see main())
     main()
 else:
     # We are supposed to run as a script, for now just exit to avoid weird
