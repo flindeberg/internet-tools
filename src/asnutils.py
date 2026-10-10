@@ -15,7 +15,6 @@ import cleanco
 import pandas as pd
 from string_grouper import match_most_similar
 
-
 ## TLS adapted for workaround
 import requests
 from requests import adapters
@@ -483,19 +482,20 @@ class ASNLookup:
 
         # start with iterating through the items and clean the names of potential companies
         asentity: AS
+        countrysources = cleanco.countrysources()
         for asn, asentity in self._asinfo.asas.items():
-            original_name = asentity.name
-            cleaned_name = cleanco.basename(original_name)
+            cleanname = cleanco.basename(asentity.name)
             # Set both company name and name of the AS
             # we will change companyname later (potentially)
-            asentity.name = cleaned_name
-            # asentity.company = cleaned_name
-            asentity.presumtivecompany = cleaned_name
+            # asentity.company = cleanname
+            asentity.presumtivecompany = cleanname
 
             # Special case for Sweden and the US; since they show up alot
             # and share literals with others (i.e. "inc", "AB" etc)
             # HACK Perhaps fix to something more beautiful
-            tmpco = cleanco.matches(original_name, cleanco.countrysources())
+            # countries whose company-type terms (e.g. "AB", "Inc") match the name
+            tmpco = cleanco.matches(asentity.name, countrysources)
+            asentity.name = cleanname
             if tmpco:
                 if "United States of America" in tmpco:
                     asentity.cc = "US"

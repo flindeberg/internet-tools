@@ -22,29 +22,20 @@ else
     folder="$2"
 fi
 
-if hash chromium-browser 2>/dev/null; then
-    browser=chromium-browser
-    ## prefer chromium over chrome, obviously..
-    echo "Found chromium-browser on path!"
-elif hash chromium 2>/dev/null; then
-    browser=chromium
-    echo "Found chromium-browser on path!"
-elif hash chrome-browser 2>/dev/null; then
-    browser=chrome-browser
-    echo "Found chrome-browser on path!"
-elif hash google-chrome 2>/dev/null; then
-    browser=google-chrome
-    echo "Found google-chrome on path!"
-elif hash google-chrome-stable 2>/dev/null; then
-    browser=google-chrome-stable
-    echo "Found chrome-browser-stable on path!"
-elif command -v /Applications/Chromium.app/Contents/MacOS/Chromium 2>/dev/null; then
-    browser=/Applications/Chromium.app/Contents/MacOS/Chromium
-    echo "Found OSX and Chromium browser"
-elif command -v /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome 2>/dev/null; then
-    browser=/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome
-    echo "Found OSX and Chrome browser"
-else
+## prefer chromium over chrome, obviously..
+## only accept browsers that actually run, e.g. Ubuntu's chromium-browser can be a snap stub
+browser=""
+for candidate in chromium-browser chromium chrome-browser google-chrome google-chrome-stable \
+    "/Applications/Chromium.app/Contents/MacOS/Chromium" \
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; do
+    if command -v "$candidate" > /dev/null 2>&1 && "$candidate" --version > /dev/null 2>&1; then
+        browser="$candidate"
+        echo "Found working browser '$browser'"
+        break
+    fi
+done
+
+if [ -z "$browser" ]; then
     echo "No compatible browser found!"
     exit 1
 fi
@@ -67,8 +58,16 @@ if ! (pgrep -f ".*$flags" > /dev/null) ; then
     echo "Starting '$browser' with flags '$flags'"
     "$browser" "${flagsarr[@]}" 2> "$folder/chrome_errors.log" &
 
-    ## sometimes we have had issues here, sleeping lets Chrome properly boot up
-    sleep 2
+    ## wait (max 20 s) for the debugging port, instead of hoping a fixed sleep is enough
+    for _ in $(seq 40); do
+        curl -s http://127.0.0.1:9222/json/version > /dev/null && break
+        sleep 0.5
+    done
+    if ! curl -s http://127.0.0.1:9222/json/version > /dev/null; then
+        echo "Headless browser did not start, see $folder/chrome_errors.log:"
+        tail -n 20 "$folder/chrome_errors.log"
+        exit 1
+    fi
 else
     echo "Did not start headless browser, trying to use existing"
 fi

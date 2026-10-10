@@ -24,6 +24,7 @@ import asnutils
 from edgeutils import EdgeTuple, EdgeType
 from asnutils import AS
 
+
 ## Manipulation of string and urls
 class urlutils:
     @staticmethod
@@ -190,10 +191,15 @@ class HarHost:
             filtered = list(filter(lambda x: x != "*", traces[key]))
             iplist = list(ipaddress.ip_address(x) for x in filtered)
             ## Set the resolves ip last of the trace times out, this ensures proper AS match
-            if iplist[-1] != ipaddress.ip_address(key):
+            ## (an empty list means that no hop answered, e.g. where ICMP is filtered)
+            if not iplist or iplist[-1] != ipaddress.ip_address(key):
                 iplist.append(ipaddress.ip_address(key))
-                print("Added {:} last to {:}".format(ipaddress.ip_address(key), ipaddress.ip_address(key)))
-            
+                print(
+                    "Added {:} last to {:}".format(
+                        ipaddress.ip_address(key), ipaddress.ip_address(key)
+                    )
+                )
+
             self._ipstrace[ipaddress.ip_address(key)] = iplist
 
             ## Set the trace status, will be used for coloring later
@@ -498,7 +504,7 @@ class Utils:
         print("URL:" + url)
         call(
             ["chrome-har-capturer", output, url],
-            cwd=os.path.dirname(os.path.realpath(__file__))
+            cwd=os.path.dirname(os.path.realpath(__file__)),
             # , shell=True
         )
 
@@ -549,9 +555,9 @@ class CheckHAR:
             if len(d["log"]["pages"]) > 0:
                 self.result.start = d["log"]["pages"][0]["startedDateTime"]
 
-            entry :dict
+            entry: dict
             for entry in d["log"]["entries"]:
-                
+
                 parsedhost = urlutils.GetHostFromString(entry["request"]["url"])
                 realsize = (
                     (entry["request"].get("headersSize", 0) or 0)
