@@ -81,21 +81,25 @@ def dprint(x):
         print(x)
 
 
+## Linux socket options for reading ICMP errors off a socket's error queue.
+## Python does not expose all of them (e.g. not IP_RECVERR before 3.14), but
+## they are part of the Linux ABI, the same on all architectures
+## (linux/in.h, linux/in6.h, linux/socket.h)
+_IP_RECVERR = getattr(socket, "IP_RECVERR", 11)
+_IPV6_RECVERR = getattr(socket, "IPV6_RECVERR", 25)
+_MSG_ERRQUEUE = getattr(socket, "MSG_ERRQUEUE", 0x2000)
+
+
 def _linux_unprivileged_available() -> bool:
     """
     Whether we can trace without raw sockets (and therefore without root) on
-    this interpreter/platform, using IP_RECVERR/IPV6_RECVERR + MSG_ERRQUEUE
-    to read ICMP errors off a plain UDP socket's error queue.
+    this platform, using IP_RECVERR/IPV6_RECVERR + MSG_ERRQUEUE to read ICMP
+    errors off a plain UDP socket's error queue.
 
     This is a Linux-only kernel/socket-API feature, see
     _macos_unprivileged_available for macOS.
     """
-    return (
-        sys.platform.startswith("linux")
-        and hasattr(socket, "IP_RECVERR")
-        and hasattr(socket, "IPV6_RECVERR")
-        and hasattr(socket, "MSG_ERRQUEUE")
-    )
+    return sys.platform.startswith("linux")
 
 
 @functools.lru_cache(maxsize=None)
@@ -416,13 +420,13 @@ class UnprivilegedTracer(object):
         if isinstance(dst_ip, ipaddress.IPv4Address):
             family = socket.AF_INET
             level = socket.SOL_IP
-            recverr_opt = socket.IP_RECVERR
+            recverr_opt = _IP_RECVERR
             ttl_opt = socket.IP_TTL
             origin = _SO_EE_ORIGIN_ICMP
         else:
             family = socket.AF_INET6
             level = socket.IPPROTO_IPV6
-            recverr_opt = socket.IPV6_RECVERR
+            recverr_opt = _IPV6_RECVERR
             ttl_opt = socket.IPV6_UNICAST_HOPS
             origin = _SO_EE_ORIGIN_ICMP6
 
@@ -451,9 +455,7 @@ class UnprivilegedTracer(object):
                 s.settimeout(remaining)
 
                 try:
-                    data, ancdata, _flags, _addr = s.recvmsg(
-                        512, 1024, socket.MSG_ERRQUEUE
-                    )
+                    data, ancdata, _flags, _addr = s.recvmsg(512, 1024, _MSG_ERRQUEUE)
                 except (socket.timeout, OSError):
                     return None, None
 
