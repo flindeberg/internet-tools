@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 from shutil import copyfile
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from elevate import elevate
 
@@ -79,6 +79,15 @@ def main(arg=None):
         help="also resolve and trace ipv6 (aaaa) addresses, not only ipv4",
     )
 
+    parser.add_argument(
+        "--asn-max-age",
+        type=int,
+        default=7,
+        metavar="DAYS",
+        help="generate new routing data for the AS-lookup (~100 MB download) "
+        "if what we have is older than this (defaults to 7, negative: never)",
+    )
+
     if arg is not None:
         args = parser.parse_args(arg)
     else:
@@ -94,11 +103,14 @@ def main(arg=None):
         elevate(show_console=False, graphical=False)
         print("Elevated, restarting application as root")
 
+    if args.asn_max_age >= 0:
+        asnutils.ensure_fresh_pyasn_data(timedelta(days=args.asn_max_age))
+
     if args.ipv6 and not asnutils.ASNLookup.has_ipv6_data():
         print(
-            "Warning: pyasn.dat has no ipv6 routes, so ipv6-addresses will be "
-            "looked up one by one via RDAP (slow). Run ./updatepyasnfiles.sh "
-            "to get current ipv4 and ipv6 routes."
+            "Warning: the routing data has no ipv6 routes, so ipv6-addresses "
+            "will be looked up one by one via RDAP (slow). Run "
+            "./updatepyasnfiles.sh to get current ipv4 and ipv6 routes."
         )
 
     ## start the program

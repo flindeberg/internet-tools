@@ -86,7 +86,9 @@ The most interesting tool to use quickly is the `generate_map.py`, which generat
 
 On Linux and macOS the traceroute runs without root (Linux reads the ICMP errors off the UDP sockets' error queues, macOS uses unprivileged ICMP datagram sockets). On other systems it needs raw sockets, i.e. root, and `generatemap.py` will ask to elevate with `sudo`. This means that *you* should make sure that you understand what the Python-script does before running it.
 
-IPv6 is traced as well with `-6`. For that the AS-lookup needs IPv6 routes in `pyasn.dat`; run `./updatepyasnfiles.sh` to fetch current IPv4 and IPv6 routes (the checked-in file only has IPv4, and is from 2021).
+IPv6 is traced as well with `-6`.
+
+The AS-lookup uses routing data (IPv4 and IPv6) for `pyasn`. `src/pyasn.dat` / `pyasn.json` is a snapshot kept in git; `generatemap.py` generates newer data locally (`pyasn_local.dat` / `.json`, not in git, ~100 MB download) when what it has is older than 7 days, and uses whichever is newest. Change the age with `--asn-max-age DAYS` (negative: never update). To update by hand, run `./updatepyasnfiles.sh`; `./updatepyasnfiles.sh pyasn` updates the snapshot in git instead.
 
 Some example usages:
 
