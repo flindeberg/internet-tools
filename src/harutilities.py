@@ -30,10 +30,10 @@ class urlutils:
     @staticmethod
     def GetHostFromString(text: str):
         matches = re.findall("https?://.*?/", text, re.MULTILINE)
-        parsedhost = (
-            "{uri.netloc}".format(uri=r) for r in (urlparse(line) for line in matches)
-        )
-        return parsedhost
+        # hostname rather than netloc, i.e. without port and without the
+        # brackets around ipv6-literals (e.g. "[2001:db8::1]:8080")
+        parsedhost = (r.hostname for r in (urlparse(line) for line in matches))
+        return (h for h in parsedhost if h)
 
     @staticmethod
     def EnsureFullURI(text: str) -> str:
@@ -96,12 +96,12 @@ class HarHost:
         self._transfersize += otherHost._transfersize
         self._realsize += otherHost._realsize
 
-    def resolve(self):
+    def resolve(self, ipv6: bool = False):
         """Resolves this harhost via dns.resolver.query (dnspython).
             TODO Strategy pattern so we can change resolver if needed
 
         Args:
-            None
+            ipv6: also resolve aaaa (ipv6) records, not only a (ipv4)
 
         Returns:
             Nothing
@@ -112,14 +112,28 @@ class HarHost:
         """
 
         try:
-            ## find both a (ipv4) and aaaa (ipv6) records
-            ##dns.resolver
-            # ips = DNS.dnslookup(h, "a")
-            ips = (a.address for a in dns.resolver.query(self._host, "A"))
-            # IPv6 fails in the tracer. So lets skip it for now
-            # ips6 = (a.address for a in dns.resolver.query(h, "AAAA"))
-            # if ips6 is not None:
-            #    ips.extend(ips6)
+            ## the url had an ip-literal (e.g. http://192.0.2.1/), nothing to resolve
+            ip = ipaddress.ip_address(self._host)
+            if ip.version == 4 or ipv6:
+                self._ipstrace[ip] = None
+            return
+        except ValueError:
+            pass
+
+        for rdtype in ["A", "AAAA"] if ipv6 else ["A"]:
+            try:
+                ips = list(a.address for a in dns.resolver.query(self._host, rdtype))
+            except dns.resolver.NoAnswer:
+                ## e.g. no aaaa record, which is quite normal
+                continue
+            except:
+                # DNS resolution messed up, such as host cannot be resolved
+                print(
+                    "Unexpected error (for {:}, {:}): {:}".format(
+                        self._host, rdtype, sys.exc_info()
+                    )
+                )
+                continue
 
             for ip in ips:
                 try:
@@ -146,12 +160,6 @@ class HarHost:
                 except:
                     print("Unexpected error:", sys.exc_info())
 
-        except:
-            # DNS resolution messed up, such as host cannot be resolved
-            # print("Unexpected error:", sys.exc_info()[0])
-            print("Unexpected error (for {:}): {:}".format(self._host, sys.exc_info()))
-            ## put it in the list, that way we still keep it even though we could not resolve it
-
     def getToTrace(self):
         """Helper func for future refactoring"""
         return self.ips
@@ -171,6 +179,7 @@ class HarHost:
         Helper function for adding traces back to HarHost
         """
         # TODO take care of the case if it is missing in traces?
+        statuses = []
         for key in self.ips:
             if key not in traces:
                 raise ValueError("Could not find key '{:}' in traces!".format(key))
@@ -181,8 +190,13 @@ class HarHost:
             ## to get router to ignore ICMPs due to icmp storm,
             if traces[key][0] == "*":
                 # lets replace it with a proper IP, if we have one
+                # (of the same family, ipv4 and ipv6 have different first hops)
+                version = ipaddress.ip_address(key).version
                 for tracedip, tracelist in traces.items():
-                    if tracelist[0] != "*":
+                    if (
+                        tracelist[0] != "*"
+                        and ipaddress.ip_address(tracelist[0]).version == version
+                    ):
                         traces[key][0] = tracelist[0]
                         # print("Updated trace to {:} with {:} at first hop"
                         #        .format(key, v[0]))
@@ -202,8 +216,12 @@ class HarHost:
 
             self._ipstrace[ipaddress.ip_address(key)] = iplist
 
-            ## Set the trace status, will be used for coloring later
-            self._trace = edgeutils.TraceType.getTraceStatus(traces[key])
+            statuses.append(edgeutils.TraceType.getTraceStatus(traces[key]))
+
+        ## Set the trace status, will be used for coloring later. The best
+        ## of the host's ips, i.e. reaching it over either ipv4 or ipv6 counts
+        if statuses:
+            self._trace = min(statuses, key=lambda t: t.value)
 
     def populateAsns(self):
         """
@@ -249,7 +267,13 @@ class HarHost:
             for current in ips:
                 # current is here an AS
                 try:
-                    country = pycountry.countries.get(alpha_2=current.cc)
+                    # (current pycountry raises LookupError for None, rather
+                    # than returning None, which would skip the entire AS)
+                    country = (
+                        pycountry.countries.get(alpha_2=current.cc)
+                        if current.cc
+                        else None
+                    )
 
                     # use lastNode, as well as the current one
                     # current is ASN, lastNode might be "localhost" or ASN
@@ -512,9 +536,9 @@ class Utils:
 class CheckHAR:
     """Class for managing HAR-files"""
 
-    def __init__(self):  # , res: resolver.Resolver):
-        # noting
-        None
+    def __init__(self, ipv6: bool = False):  # , res: resolver.Resolver):
+        # also resolve and trace ipv6 (aaaa records)
+        self._ipv6 = ipv6
         self.nameip = dict()
         self.ipname = dict()
         # Lets have a lookup we can share for faster lookups
@@ -599,7 +623,7 @@ class CheckHAR:
         # go through all the hosts we use, and check paths and asns passed to get there
         print("Starting to resolve hosts")
         for key, value in self.result.hosts.items():
-            value.resolve()
+            value.resolve(self._ipv6)
 
         # Make sure we trace all ips
         ipstotrace = list()

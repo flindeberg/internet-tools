@@ -179,21 +179,30 @@ class ASNLookup:
         # Our presumed object
         self._asinfo = AsInfo()
 
+    @classmethod
+    def has_ipv6_data(cls) -> bool:
+        """
+        Whether pyasn.dat has ipv6 routes. Without them every ipv6-address is
+        treated as unannounced and looked up via RDAP, one by one.
+        """
+        # Google Public DNS, announced for as long as there has been ipv6 routing
+        return cls.__p.lookup("2001:4860:4860::8888")[0] is not None
+
     def lookupmanystr(self, ips: List[str]) -> AsInfo:
-        """Looks up AsInfo from a list of IP-addresses in string-type"""
+        """Looks up AsInfo from a list of IP-addresses (ipv4 or ipv6) in string-type"""
         ipstyped = list()
         for ip in set(ips):  ## remove duplicates
             try:
                 ## translate to typed
-                ipc = ipaddress.IPv4Address(ip)
+                ipc = ipaddress.ip_address(ip)
                 ipstyped.append(ipc)
             except ValueError as ve:
                 print("Issues with ip-address '{:}': {:}".format(ip, ve))
 
         return self.lookupmany(ipstyped)
 
-    def lookupmany(self, ips: List[ipaddress.IPv4Address]) -> AsInfo:
-        """Looks up AsInfo from a list of IP-addresses ipaddress.IPv4Address-type"""
+    def lookupmany(self, ips: List[ipaddress._BaseAddress]) -> AsInfo:
+        """Looks up AsInfo from a list of IP-addresses (ipv4 or ipv6) ipaddress-type"""
 
         # Our presumed object
         # use instance variable for now
@@ -203,7 +212,7 @@ class ASNLookup:
         # go through ips and resolve  them
         for ip in ips:
             try:
-                ## we know we have proper IPv4 address here
+                ## we know we have proper IPv4 or IPv6 address here
 
                 ## IDEA:
                 # 1) check if we have resolved that IP, if we have use it
@@ -325,13 +334,24 @@ class ASNLookup:
                                     # EX: https://rdap.arin.net/registry/ip/150.222.244.8
                                     # we need entities -> (element in array) -> vcardarray -> [1] -> [1] -> [3] => Amazon Technologies Inc.
                                     # lets overwrite with whatever we find in vcard
-                                    for entity in data["entities"]:
+                                    # registrants first, e.g. RIPE's organisation
+                                    # objects ("ORG-...") come after their contacts
+                                    entities = sorted(
+                                        data.get("entities", []),
+                                        key=lambda e: "registrant"
+                                        not in e.get("roles", []),
+                                    )
+                                    for entity in entities:
                                         # go through all entities
                                         # which match certain criteria
+                                        # (not abuse contacts, not RIPE maintainers)
                                         if (
                                             "vcardArray" in entity
                                             and "roles" in entity
                                             and "abuse" not in entity["roles"]
+                                            and not entity.get("handle", "").endswith(
+                                                "-MNT"
+                                            )
                                         ):
                                             # we have a match, a vcardArray!
                                             # this is the magic position of the name in a vcardarray-record
@@ -349,12 +369,19 @@ class ASNLookup:
                                             break
 
                                     # if we have description that is even better, overwrite again
+                                    # (but not RCS lines such as "$Id: inet6num:...",
+                                    # common in old RIPE objects)
                                     if "remarks" in data:
                                         if len(data["remarks"]) > 0:
-                                            if "description" in data["remarks"][0]:
-                                                name = data["remarks"][0][
-                                                    "description"
-                                                ][0]
+                                            descriptions = [
+                                                d
+                                                for d in data["remarks"][0].get(
+                                                    "description", []
+                                                )
+                                                if not d.startswith("$Id")
+                                            ]
+                                            if descriptions:
+                                                name = descriptions[0]
 
                                     if name == None:
                                         # We have no idea what is happening, failing for now
@@ -409,8 +436,10 @@ class ASNLookup:
                             asinfo.asas[pyasntuple[0]] = asn  #
 
                 elif ip.is_private:
-                    ## local ip-address
-                    cidr = ipaddress.ip_network(ip).supernet(new_prefix=24)
+                    ## local ip-address, group per /24 (ipv4) or /64 (ipv6)
+                    cidr = ipaddress.ip_network(ip).supernet(
+                        new_prefix=24 if ip.version == 4 else 64
+                    )
 
                     print(
                         "IP-address {:} is not public, adding as part of {:}.".format(

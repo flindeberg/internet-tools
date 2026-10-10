@@ -238,10 +238,10 @@ def draw_graph(graph: asnutils.EdgeList, file: str, graph_layout="sfdp") -> List
     # for now defaulting to graphviz
     if graph_layout == "sfdp":
         ## Default to using graphviz, better and faster..
+        # trailing space in args required: networkx concatenates "-Groot={root}"
+        # onto args with no separator, which otherwise merges into one
+        # unparsable token (e.g. "-Gmaxiter=200-Groot=localhost")
         graph_pos = nx.drawing.nx_agraph.graphviz_layout(
-            # trailing space required: networkx concatenates "-Groot={root}"
-            # onto args with no separator, which otherwise merges into one
-            # unparsable token (e.g. "-Gmaxiter=200-Groot=localhost")
             G, prog="neato", root="localhost", args="-Gmaxiter=200 "
         )
     elif graph_layout == "spring":
