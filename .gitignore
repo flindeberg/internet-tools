@@ -12,3 +12,6 @@ src/examplehars/*.png
 ## generated routing data for pyasn (see src/updatepyasnfiles.sh)
 src/pyasn_local.dat
 src/pyasn_local.json
+
+## python virtual environment
+.venv/

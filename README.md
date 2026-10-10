@@ -54,23 +54,23 @@ Chrome or Chromium is easily installed by either your package manager or by goog
 
 If you are missing `npm` head over to https://nodejs.org/en/download/ and download and install `npm` / `nodejs`.
 
-### Graphviz (partially optional)
+### Graphviz
 
-Graphviz is the most decent graph generator I have found, as such I really suggest it. Graphviz is available on most linux distributions and in `brew` for OSX.
+Graphviz is the most decent graph generator I have found, and the graphs are laid out with its `neato`, so it is needed, including its development headers (for `pygraphviz`). Install it with `brew install graphviz` on macOS, or e.g. `apt install graphviz libgraphviz-dev` on Debian/Ubuntu.
 
 ### Python dependencies
 
-You also need som python modules, and of course python (3+) itself. Python is most easily downloaded from their homepage (https://www.python.org/downloads/) or your package manager of choice.
+Python 3.13 is what is tested (in CI as well). Install the Python modules in a virtual environment:
 
-When you have pip(3) installed, run the following:
+    python3 -m venv .venv
+    . .venv/bin/activate
+    pip install -r requirements.txt
 
-    pip3 install -r requirements.txt
+On macOS `pygraphviz` does not find Homebrew's Graphviz by itself, so point it there:
 
-Or manually:
+    CFLAGS="-I$(brew --prefix graphviz)/include" LDFLAGS="-L$(brew --prefix graphviz)/lib" pip install -r requirements.txt
 
-    pip3 install networkx matplotlib splinter bs4 pyasn dnspython pycountry elevate pandas cleanco string_grouper pygraphviz requests
-
-Depending on system pip3 might not be aliased and instead pip should be used. Also some systems might require pip3 to be run as root (or use the `--user` flag to do a user install).
+Do not install the PyPI package `string_grouper`; `src/string_grouper.py` is a modified copy of it.
 
 ## Using the tools
 
@@ -82,7 +82,7 @@ See `src/` directory, and in particular `generatemap.py`, `parallelltracert.py`,
 
 ### Command line tools
 
-The most interesting tool to use quickly is the `generate_map.py`, which generates a map / graph from either a list of urls or a set of har-files. Run it from the `src/` directory.
+The most interesting tool to use quickly is `generatemap.py`, which generates a map / graph from either a list of urls or a set of har-files. Run it from the `src/` directory.
 
 On Linux and macOS the traceroute runs without root (Linux reads the ICMP errors off the UDP sockets' error queues, macOS uses unprivileged ICMP datagram sockets). On other systems it needs raw sockets, i.e. root, and `generatemap.py` will ask to elevate with `sudo`. This means that *you* should make sure that you understand what the Python-script does before running it.
 
