@@ -182,3 +182,19 @@ def test_hosts_from_urls():
     assert list(
         harutilities.urlutils.GetHostFromString("http://[2001:db8::1]:8080/a")
     ) == ["2001:db8::1"]
+
+
+def test_quoted_payload_matching():
+    payload = pt._probe_payload(5)
+    assert payload == b"\x05" * 5
+    assert pt._quotes_payload(payload, payload)
+    # router quoted only the UDP header
+    assert pt._quotes_payload(b"", payload)
+    # padded to 128 bytes of original datagram (RFC 4884), as seen from
+    # 46.59.114.16: 112 bytes of payload
+    assert pt._quotes_payload(payload + b"\0" * 107, payload)
+    # truncated quote
+    assert pt._quotes_payload(payload[:2], payload)
+    # late answer to the probe with ttl 4, padded or not
+    assert not pt._quotes_payload(pt._probe_payload(4), payload)
+    assert not pt._quotes_payload(pt._probe_payload(4) + b"\0" * 108, payload)
