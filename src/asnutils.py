@@ -643,11 +643,16 @@ class ASNLookup:
 
         # print(complist)
 
+        known = set(masterlist)
         for tup in zip(complist, matches):
-            # tup[0] org name, [1], matched name
-            if tup[0] != tup[1]:
-                # we only need to do something if they differ
-                print("Merging presumtive company {:} with {:}".format(tup[0], tup[1]))
+            # tup[0] org name, [1] the company it matched, or the org name
+            # itself if none did (which is also what we get when the org name
+            # is exactly a known company, e.g. "Netnod")
+            if tup[1] in known:
+                if tup[0] != tup[1]:
+                    print(
+                        "Merging presumtive company {:} with {:}".format(tup[0], tup[1])
+                    )
                 ent: AS
                 for ent in filter(
                     lambda x: x.presumtivecompany == tup[0], self._asinfo.ipas.values()
