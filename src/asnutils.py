@@ -389,23 +389,13 @@ class ASNLookup:
                                 else:
                                     # we do not have an ASN!
                                     # but we have a country, so lets go with that
-                                    # lets create a negative number representing it
-                                    if len(asinfo.asas) > 0:
-                                        asns = [
-                                            min(
-                                                min(
-                                                    [
-                                                        i
-                                                        for i in asinfo.asas
-                                                        if isinstance(i, int)
-                                                    ]
-                                                )
-                                                - 1,
-                                                -1,
-                                            )
-                                        ]
-                                    else:
-                                        asns = [-1]
+                                    # lets create a negative number representing it,
+                                    # below all we have (asas also has non-int keys,
+                                    # e.g. for private networks, so maybe no ints yet)
+                                    known = [
+                                        i for i in asinfo.asas if isinstance(i, int)
+                                    ]
+                                    asns = [min(known + [0]) - 1]
 
                                     ## create and add to unannounced even if we do not have it
                                     asf = ASFind(asns, start, end)
