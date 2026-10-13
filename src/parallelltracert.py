@@ -135,6 +135,26 @@ def create_tracer(dst, hops=30, quiet=False):
     return RawSocketTracer(dst, hops=hops, quiet=quiet)
 
 
+def _probe_payload(ttl: int) -> bytes:
+    """
+    Payload of the probe with the given ttl: ttl bytes of value ttl. As all
+    probes of a trace are one flow, its length (RawSocketTracer) or content
+    (UnprivilegedTracer) is what tells them apart.
+    """
+    return bytes([ttl]) * ttl
+
+
+def _quotes_payload(quoted: bytes, payload: bytes) -> bool:
+    """
+    Whether the payload quoted in an ICMP error is that of our probe.
+    Routers may quote less of it (nothing, if only the UDP header), or pad
+    it with zeros (RFC 4884, e.g. for MPLS extensions), so only the part
+    both have is compared.
+    """
+    n = min(len(quoted), len(payload))
+    return quoted[:n] == payload[:n]
+
+
 def _resolve(dst):
     """Returns dst as an ipaddress object, resolving it if it is a hostname"""
     try:
@@ -437,11 +457,13 @@ class UnprivilegedTracer(object):
             s.settimeout(self.timeoutSec)
             self._bind(s, family)
 
+            # tells this probe apart from the earlier ones of the trace
+            # (same flow, so late errors for them end up on our socket)
+            payload = _probe_payload(ttl)
+
             start = time.time()
             try:
-                # payload length tells this probe apart from the earlier ones
-                # of the trace (same flow, so same socket for late errors)
-                s.sendto(b"\0" * ttl, (dst_ip.compressed, port))
+                s.sendto(payload, (dst_ip.compressed, port))
             except OSError as e:
                 # some errors (e.g. immediate "no route") can be raised
                 # synchronously here rather than via the error queue
@@ -459,9 +481,8 @@ class UnprivilegedTracer(object):
                 except (socket.timeout, OSError):
                     return None, None
 
-                # the error queue gives us the payload quoted in the ICMP error,
-                # which is empty if the router only quoted the UDP header
-                if len(data) not in (0, ttl):
+                # the error queue gives us the payload quoted in the ICMP error
+                if not _quotes_payload(data, payload):
                     # late answer to an earlier probe, keep waiting for ours
                     continue
 
@@ -743,8 +764,9 @@ class RawSocketTracer(object):
         else:
             sender.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_UNICAST_HOPS, ttl)
 
-        # payload length tells this probe apart from the earlier ones
-        payload = b"\0" * ttl
+        # its length (quoted in the UDP header of the error) tells this probe
+        # apart from the earlier ones
+        payload = _probe_payload(ttl)
 
         with query.lock:
             # a fresh semaphore per probe, so nothing meant for an
