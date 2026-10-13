@@ -15,3 +15,6 @@ src/pyasn_local.json
 
 ## python virtual environment
 .venv/
+
+## log written by src/generatehar.sh to the working directory
+src/har_errors.log
