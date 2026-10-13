@@ -201,6 +201,8 @@ def test_pipeline_ipv4_and_ipv6(offline):
         ("cc", "Sweden", "Netnod (SE)"),
         ("company", "Google", "(15169, US)"),
         ("company", "Cloudflare", "(13335, US)"),
+        # also when the cleaned name is exactly a known company
+        ("company", "Netnod", "Netnod (SE)"),
     }
 
 
