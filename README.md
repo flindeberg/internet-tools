@@ -42,17 +42,17 @@ An example of visit to four Swedish newssites.
 
 First off, we need all dependencies
 
-### Chrome-headless automation
+### Browser automation (HAR capture)
 
-This project is dependent on `chrome-har-capturer` (see https://github.com/cyrus-and/chrome-har-capturer) to capture hars with the help of Google Chrome / Chromium. 
+Websites are visited with headless Chromium through [Playwright](https://playwright.dev/python/), which records a HAR file of everything the browser loads. Playwright is installed with the Python dependencies below; its browser needs one more step:
 
-Chrome or Chromium is easily installed by either your package manager or by googling a download link. As long as the version is relatively modern there should be no issues.
+    python -m playwright install chromium
 
-`chrome-har-capturer` is installed via npm like this (`--global` is needed for the utility to be on `path`):
+#### Legacy: chrome-har-capturer
+
+The old way to capture HARs, with [`chrome-har-capturer`](https://github.com/cyrus-and/chrome-har-capturer) and Google Chrome / Chromium (`src/generatehar.sh`), is kept for comparisons with earlier results, but is not the default: use `--har-capture chrome-har-capturer`. With current Chrome its HARs have no cookies and mostly no request/response sizes, and a few fewer requests and hosts than Playwright's. It needs Chrome and
 
     npm install --global chrome-har-capturer
-
-If you are missing `npm` head over to https://nodejs.org/en/download/ and download and install `npm` / `nodejs`.
 
 ### Graphviz
 
@@ -78,7 +78,7 @@ This repository contains tools usable in general python projects, such as (simpl
 
 ### Modules
 
-See `src/` directory, and in particular `generatemap.py`, `parallelltracert.py`, `harutilities.py` and `internetgraph.py`. The har generation is done by `generatehar.sh`, a bash-script, which handles input / output and invokes `chrome-har-capturer` with decent arguments (i.e. timeouts). 
+See `src/` directory, and in particular `generatemap.py`, `parallelltracert.py`, `harutilities.py` and `internetgraph.py`. The har generation is done by `harcapture.py` (Playwright), or with `--har-capture chrome-har-capturer` by the legacy `generatehar.sh`, a bash-script invoking `chrome-har-capturer` with the same settings (i.e. timeouts). 
 
 ### Command line tools
 
