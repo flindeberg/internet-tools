@@ -27,7 +27,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install pytest
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    # the runner image already has Google Chrome and Node.js
+    - name: Install Playwright's browser
+      run: python -m playwright install --with-deps chromium
+    # legacy HAR capture; the runner image already has Google Chrome and Node.js
     - name: Install chrome-har-capturer
       run: sudo npm install --global chrome-har-capturer
     - name: Run tests
@@ -47,8 +49,14 @@ jobs:
       run: |
         cd src
         python generatemap.py -w www.dn.se www.svd.se -o newssites
+    - name: Test simple pages, legacy HAR capture
+      run: |
+        cd src
+        python generatemap.py -q --har-capture chrome-har-capturer -w www.dn.se -o newssites-legacy
     - name: Upload graph image
       uses: actions/upload-artifact@v4
       with:
         name: Upload graph
-        path: src/newssites/
+        path: |
+          src/newssites/
+          src/newssites-legacy/

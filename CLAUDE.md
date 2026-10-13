@@ -2,14 +2,15 @@
 
 Notes for working on this repo. User-facing docs are in `README.md`.
 
-Tools from the 2021 PhD thesis "Coordinating the Internet" (Lindeberg). The main tool, `src/generatemap.py`, visits websites with headless Chrome, traces the route to every host they load content from, and draws which networks (AS), countries and companies the sites depend on. The code is old research code: make targeted changes and keep its style rather than refactoring broadly.
+Tools from the 2021 PhD thesis "Coordinating the Internet" (Lindeberg). The main tool, `src/generatemap.py`, visits websites with headless Chromium, traces the route to every host they load content from, and draws which networks (AS), countries and companies the sites depend on. The code is old research code: make targeted changes and keep its style rather than refactoring broadly.
 
 ## Layout
 
 The pipeline (`generatemap.py` → `CheckHAR.Load()` → `CheckHAR.cook()` → `getEdges()` → `draw_graph()`):
 
 - `src/generatemap.py`: CLI entry point; elevates with sudo only if `parallelltracert.requires_root()`.
-- `src/generatehar.sh`: headless Chrome + `chrome-har-capturer` → a HAR file.
+- `src/harcapture.py`: headless Chromium via Playwright → a HAR file (default).
+- `src/generatehar.sh`: legacy HAR capture with Chrome + `chrome-har-capturer` (`--har-capture chrome-har-capturer`), kept for comparisons with earlier results; its HARs lack cookies and most sizes with current Chrome.
 - `src/harutilities.py`: HAR parsing (hosts, bytes), DNS (A, plus AAAA with `-6`), and `cook()`: resolve → trace → AS lookup → edges.
 - `src/parallelltracert.py`: parallel UDP traceroute. `TraceManager` runs and caches traces; `UnprivilegedTracer` (Linux) and `RawSocketTracer` (macOS and the rest) do one trace each.
 - `src/asnutils.py`: IP → AS with `pyasn`; RDAP (via ARIN) for unannounced ranges such as IXP LANs; company names via `cleanco` and `string_grouper`.
@@ -20,16 +21,16 @@ Not part of the pipeline: `rfccounter/` (RFC statistics, its own CI workflow), `
 
 ## Setup, run, test
 
-See README for Chrome, `chrome-har-capturer` and Graphviz. Python 3.13, in `.venv` (git ignored); on macOS `pygraphviz` needs `CFLAGS`/`LDFLAGS` pointing at `brew --prefix graphviz`.
+See README for Playwright's browser (`python -m playwright install chromium`), Graphviz, and the legacy `chrome-har-capturer`. Python 3.13, in `.venv` (git ignored); on macOS `pygraphviz` needs `CFLAGS`/`LDFLAGS` pointing at `brew --prefix graphviz`.
 
     cd src
     python generatemap.py -6 -q -w www.netnod.se -o out      # full pipeline, ~30 s per few sites
-    python generatemap.py -q -e out/www_netnod_se.har -o out  # from an existing HAR, no Chrome
+    python generatemap.py -q -e out/www_netnod_se.har -o out  # from an existing HAR, no browser
     python parallelltracert.py                                # just traces, prints the hops
     python -m pytest ../tests                                 # offline tests
     black --check . ../tests ../pdfs                          # CI fails PRs on black
 
-Run from `src/`: `generatehar.sh` is called as `./generatehar.sh` and writes `har_errors.log` to the working directory.
+Run from `src/`: the legacy `generatehar.sh` is called as `./generatehar.sh` and writes `har_errors.log` to the working directory. `tests/test_harcapture.py` needs a local port and Playwright's browser (skipped without it).
 
 Real runs need the network: DNS, outgoing UDP probes and incoming ICMP, RDAP, and routing-data downloads. In Claude Code's sandbox those (and `git push`/`fetch` over SSH, and `gh`) have to run outside the sandbox.
 

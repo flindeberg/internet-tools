@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from elevate import elevate
 
 import asnutils
+import harcapture
 import harutilities
 import internetgraph
 import parallelltracert
@@ -86,6 +87,14 @@ def main(arg=None):
         metavar="DAYS",
         help="generate new routing data for the AS-lookup (~100 MB download) "
         "if what we have is older than this (defaults to 7, negative: never)",
+    )
+
+    parser.add_argument(
+        "--har-capture",
+        choices=["playwright", "chrome-har-capturer"],
+        default="playwright",
+        help="how to capture HARs: playwright (default), or the legacy "
+        "chrome-har-capturer (generatehar.sh, needs Chrome and npm)",
     )
 
     if arg is not None:
@@ -224,47 +233,44 @@ def CreateFolder(args):
 
 def GenerateHarFile(hostset, tmpdir: str, args):
     ## Generates a har-file from a set of hosts
-    with tempfile.NamedTemporaryFile() as tmpfile:
+    hostset = list(urlutils.EnsureFullURI(h) for h in hostset)
 
-        hostset = list(urlutils.EnsureFullURI(h) for h in hostset)
+    print("The set of hosts is {:}".format(hostset))
 
-        print("The set of hosts is {:}".format(hostset))
+    ## visit all of them, as many times as asked for
+    urls = [hs for i in range(args.iterations) for hs in hostset]
 
-        ## need to generate a list of hosts for the chrome-har bash-script
-        with open(tmpfile.name, "w+") as tf:
-            hsnewlines = []
-            ## write many
-            for i in range(args.iterations):
-                for hs in hostset:
-                    hsnewlines.append(hs + "\n")
+    if args.har_capture == "chrome-har-capturer":
+        ## legacy, the bash-script wants a file with the hosts
+        with tempfile.NamedTemporaryFile("w+") as tmpfile:
+            tmpfile.writelines(u + "\n" for u in urls)
+            tmpfile.flush()
+            harfilename, harfullname = CreateHarFile(tmpfile, tmpdir)
+    else:
+        harfilename = "last_run.har"
+        harfullname = os.path.join(tmpdir, harfilename)
+        harcapture.capture(urls, harfullname)
 
-            tf.writelines(hsnewlines)
+    ## load the actual har-file. This wil do work such as tracing
+    if args.output is not None:
+        print("Copying har-file to output")
+        toharfile = os.path.join(args.output, harfilename)
+        if len(hostset) == 1:
+            # we have only one host, lets use smarter name
+            uri = urlparse(hostset[0])
+            toharfile = os.path.join(args.output, uri.netloc.replace(".", "_") + ".har")
+            print(hostset)
+            print("Moving har-file to {:}".format(toharfile))
 
-        ## We have prepared hosts, lets run
-        harfilename, harfullname = CreateHarFile(tmpfile, tmpdir)
+        copyfile(harfullname, toharfile)
+        #  change our reference so we used copied file instead
+        harfullname = toharfile
 
-        ## load the actual har-file. This wil do work such as tracing
-        if args.output is not None:
-            print("Copying har-file to output")
-            toharfile = os.path.join(args.output, harfilename)
-            if len(hostset) == 1:
-                # we have only one host, lets use smarter name
-                uri = urlparse(hostset[0])
-                toharfile = os.path.join(
-                    args.output, uri.netloc.replace(".", "_") + ".har"
-                )
-                print(hostset)
-                print("Moving har-file to {:}".format(toharfile))
-
-            copyfile(harfullname, toharfile)
-            #  change our reference so we used copied file instead
-            harfullname = toharfile
-
-        return harfullname
+    return harfullname
 
 
 def CreateHarFile(tmpfile, tmpdir: str):
-    ## We have prepared hosts, lets run
+    ## Legacy: chrome-har-capturer via generatehar.sh
     subprocess.call(["./generatehar.sh", tmpfile.name, tmpdir])
     # subprocess.call(["ls", "-alh", tmpdir])
 

@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+## LEGACY: HAR capture with chrome-har-capturer, used by
+## generatemap.py --har-capture chrome-har-capturer. The default is
+## harcapture.py (Playwright), which records cookies and sizes too.
+##
 ## first argument is input file
 ## second argument is output folder
 
